@@ -1,0 +1,24 @@
+# Core Web Framework
+fastapi==0.111.0
+uvicorn[standard]==0.30.0
+
+# Data Validation & Settings
+pydantic==2.7.4
+pydantic-settings==2.3.4
+
+# Database & Migrations
+sqlalchemy==2.0.30
+psycopg2-binary==2.9.9
+alembic==1.13.2
+
+# Security & Authentication
+python-jose[cryptography]==3.3.0
+bcrypt==4.0.1
+python-multipart==0.0.9
+
+# Utilities & Specialized Tasks
+apscheduler==3.11.2
+twstock==1.5.1
+
+# Development & Testing
+pytest==7.3.1
