@@ -75,14 +75,20 @@ export interface StockSyncStatus {
   records_upserted: number;
 }
 
-export interface StockSyncResult {
-  message: string;
+export interface StockSyncJob {
+  id: number;
   symbol: string;
-  start: string;
-  end: string;
+  status: string;
+  start?: string | null;
+  end?: string | null;
+  message?: string | null;
+  error?: string | null;
   records_upserted: number;
   records_skipped: number;
   months_requested: number;
+  created_at: string;
+  started_at?: string | null;
+  completed_at?: string | null;
 }
 
 export interface Watchlist {
@@ -102,12 +108,4 @@ export interface WatchlistWithQuotes {
   id: number;
   name: string;
   quotes: StockQuote[];
-}
-
-export interface WatchlistItemCreate {
-  symbol: string;
-}
-
-export interface MessageResponse {
-  message: string;
 }

@@ -6,12 +6,6 @@ from typing import List, Optional
 from pydantic import BaseModel, EmailStr, Field, field_validator
 
 
-# ─── Shared ──────────────────────────────────────────────
-
-class MessageResponse(BaseModel):
-    message: str
-
-
 # ─── User Base ───────────────────────────────────────────
 
 class UserBase(BaseModel):
@@ -119,14 +113,26 @@ class StockSyncStatusRead(BaseModel):
     records_upserted: int
 
 
-class StockSyncResultRead(BaseModel):
-    message: str
+class StockSyncJobCreate(BaseModel):
     symbol: str
-    start: date
-    end: date
+    start: Optional[date] = None
+    end: Optional[date] = None
+
+
+class StockSyncJobRead(BaseModel):
+    id: int
+    symbol: str
+    status: str
+    start: Optional[date] = None
+    end: Optional[date] = None
+    message: Optional[str] = None
+    error: Optional[str] = None
     records_upserted: int
     records_skipped: int
     months_requested: int
+    created_at: datetime
+    started_at: Optional[datetime] = None
+    completed_at: Optional[datetime] = None
 
 
 class StockQuoteRead(BaseModel):
@@ -155,8 +161,8 @@ class WatchlistCreate(WatchlistBase):
     pass
 
 
-class WatchlistItemCreate(BaseModel):
-    symbol: str = Field(..., min_length=1, max_length=10)
+class WatchlistUpdate(BaseModel):
+    name: Optional[str] = Field(None, min_length=1, max_length=100)
 
 
 class WatchlistItemRead(BaseModel):

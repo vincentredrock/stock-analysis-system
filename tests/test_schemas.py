@@ -3,7 +3,6 @@ from pydantic import ValidationError
 
 from app.schemas import (
     LoginRequest,
-    MessageResponse,
     RefreshRequest,
     StockBase,
     TokenPair,
@@ -12,7 +11,6 @@ from app.schemas import (
     UserCreate,
     UserRead,
     WatchlistBase,
-    WatchlistItemCreate,
 )
 
 
@@ -91,12 +89,6 @@ class TestTokenPair:
     def test_custom_token_type(self):
         pair = TokenPair(access_token="abc", refresh_token="def", token_type="basic")
         assert pair.token_type == "basic"
-
-
-class TestMessageResponse:
-    def test_message_field(self):
-        msg = MessageResponse(message="hello")
-        assert msg.message == "hello"
 
 
 class TestLoginRequest:
@@ -195,19 +187,3 @@ class TestWatchlistBase:
         with pytest.raises(ValidationError) as exc_info:
             WatchlistBase(name="x" * 101)
         assert "String should have at most 100 characters" in str(exc_info.value)
-
-
-class TestWatchlistItemCreate:
-    def test_valid(self):
-        item = WatchlistItemCreate(symbol="2330")
-        assert item.symbol == "2330"
-
-    def test_empty_symbol(self):
-        with pytest.raises(ValidationError) as exc_info:
-            WatchlistItemCreate(symbol="")
-        assert "String should have at least 1 character" in str(exc_info.value)
-
-    def test_symbol_too_long(self):
-        with pytest.raises(ValidationError) as exc_info:
-            WatchlistItemCreate(symbol="a" * 11)
-        assert "String should have at most 10 characters" in str(exc_info.value)

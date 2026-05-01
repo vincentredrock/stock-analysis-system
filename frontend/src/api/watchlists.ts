@@ -3,8 +3,6 @@ import type {
   Watchlist,
   WatchlistCreate,
   WatchlistWithQuotes,
-  WatchlistItemCreate,
-  MessageResponse,
 } from "@/types";
 
 export async function listWatchlists(): Promise<Watchlist[]> {
@@ -22,25 +20,25 @@ export async function getWatchlist(id: number): Promise<Watchlist> {
   return res.data;
 }
 
-export async function deleteWatchlist(id: number): Promise<MessageResponse> {
-  const res = await apiClient.delete<MessageResponse>(`/watchlists/${id}`);
+export async function deleteWatchlist(id: number): Promise<void> {
+  await apiClient.delete(`/watchlists/${id}`);
+}
+
+export async function updateWatchlist(id: number, data: Partial<WatchlistCreate>): Promise<Watchlist> {
+  const res = await apiClient.patch<Watchlist>(`/watchlists/${id}`, data);
   return res.data;
 }
 
-export async function addWatchlistItem(
-  watchlistId: number,
-  data: WatchlistItemCreate
-): Promise<Watchlist> {
-  const res = await apiClient.post<Watchlist>(`/watchlists/${watchlistId}/items`, data);
+export async function addWatchlistItem(watchlistId: number, symbol: string): Promise<Watchlist> {
+  const res = await apiClient.put<Watchlist>(`/watchlists/${watchlistId}/items/${symbol}`);
   return res.data;
 }
 
 export async function removeWatchlistItem(
   watchlistId: number,
   symbol: string
-): Promise<Watchlist> {
-  const res = await apiClient.delete<Watchlist>(`/watchlists/${watchlistId}/items/${symbol}`);
-  return res.data;
+): Promise<void> {
+  await apiClient.delete(`/watchlists/${watchlistId}/items/${symbol}`);
 }
 
 export async function getWatchlistQuotes(watchlistId: number): Promise<WatchlistWithQuotes> {
