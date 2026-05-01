@@ -11,31 +11,31 @@ from tests.conftest import login_user, register_user
 
 class TestWatchlistsAuth:
     def test_list_requires_auth(self, client):
-        response = client.get("/watchlists")
+        response = client.get("/api/v1/watchlists")
         assert response.status_code == status.HTTP_401_UNAUTHORIZED
 
     def test_create_requires_auth(self, client):
-        response = client.post("/watchlists", json={"name": "My List"})
+        response = client.post("/api/v1/watchlists", json={"name": "My List"})
         assert response.status_code == status.HTTP_401_UNAUTHORIZED
 
     def test_get_requires_auth(self, client):
-        response = client.get("/watchlists/1")
+        response = client.get("/api/v1/watchlists/1")
         assert response.status_code == status.HTTP_401_UNAUTHORIZED
 
     def test_delete_requires_auth(self, client):
-        response = client.delete("/watchlists/1")
+        response = client.delete("/api/v1/watchlists/1")
         assert response.status_code == status.HTTP_401_UNAUTHORIZED
 
     def test_add_item_requires_auth(self, client):
-        response = client.post("/watchlists/1/items", json={"symbol": "2330"})
+        response = client.post("/api/v1/watchlists/1/items", json={"symbol": "2330"})
         assert response.status_code == status.HTTP_401_UNAUTHORIZED
 
     def test_remove_item_requires_auth(self, client):
-        response = client.delete("/watchlists/1/items/2330")
+        response = client.delete("/api/v1/watchlists/1/items/2330")
         assert response.status_code == status.HTTP_401_UNAUTHORIZED
 
     def test_quotes_requires_auth(self, client):
-        response = client.get("/watchlists/1/quotes")
+        response = client.get("/api/v1/watchlists/1/quotes")
         assert response.status_code == status.HTTP_401_UNAUTHORIZED
 
 
@@ -43,7 +43,7 @@ class TestWatchlistsAuth:
 
 class TestCreateWatchlist:
     def test_create_success(self, auth_client):
-        response = auth_client.post("/watchlists", json={"name": "Tech Stocks"})
+        response = auth_client.post("/api/v1/watchlists", json={"name": "Tech Stocks"})
         assert response.status_code == status.HTTP_201_CREATED
         data = response.json()
         assert data["name"] == "Tech Stocks"
@@ -51,11 +51,11 @@ class TestCreateWatchlist:
         assert data["items"] == []
 
     def test_create_missing_name(self, auth_client):
-        response = auth_client.post("/watchlists", json={})
+        response = auth_client.post("/api/v1/watchlists", json={})
         assert response.status_code == status.HTTP_422_UNPROCESSABLE_ENTITY
 
     def test_create_empty_name(self, auth_client):
-        response = auth_client.post("/watchlists", json={"name": ""})
+        response = auth_client.post("/api/v1/watchlists", json={"name": ""})
         assert response.status_code == status.HTTP_422_UNPROCESSABLE_ENTITY
 
 
@@ -63,20 +63,20 @@ class TestCreateWatchlist:
 
 class TestListWatchlists:
     def test_list_empty(self, auth_client):
-        response = auth_client.get("/watchlists")
+        response = auth_client.get("/api/v1/watchlists")
         assert response.status_code == status.HTTP_200_OK
         assert response.json() == []
 
     def test_list_multiple(self, auth_client):
-        auth_client.post("/watchlists", json={"name": "List 1"})
-        auth_client.post("/watchlists", json={"name": "List 2"})
-        response = auth_client.get("/watchlists")
+        auth_client.post("/api/v1/watchlists", json={"name": "List 1"})
+        auth_client.post("/api/v1/watchlists", json={"name": "List 2"})
+        response = auth_client.get("/api/v1/watchlists")
         assert response.status_code == status.HTTP_200_OK
         assert len(response.json()) == 2
 
     def test_list_only_own_watchlists(self, auth_client, client):
         # Create first user and watchlist
-        auth_client.post("/watchlists", json={"name": "User1 List"})
+        auth_client.post("/api/v1/watchlists", json={"name": "User1 List"})
 
         # Create second user
         register_user(client, username="user2", email="user2@example.com")
@@ -84,7 +84,7 @@ class TestListWatchlists:
         token = login_resp.json()["access_token"]
         client.headers.update({"Authorization": f"Bearer {token}"})
 
-        response = client.get("/watchlists")
+        response = client.get("/api/v1/watchlists")
         assert response.status_code == status.HTTP_200_OK
         assert response.json() == []
 
@@ -93,12 +93,12 @@ class TestListWatchlists:
 
 class TestGetWatchlist:
     def test_get_success(self, auth_client, sample_stocks):
-        create_resp = auth_client.post("/watchlists", json={"name": "Tech"})
+        create_resp = auth_client.post("/api/v1/watchlists", json={"name": "Tech"})
         wl_id = create_resp.json()["id"]
 
-        auth_client.post(f"/watchlists/{wl_id}/items", json={"symbol": "2330"})
+        auth_client.post(f"/api/v1/watchlists/{wl_id}/items", json={"symbol": "2330"})
 
-        response = auth_client.get(f"/watchlists/{wl_id}")
+        response = auth_client.get(f"/api/v1/watchlists/{wl_id}")
         assert response.status_code == status.HTTP_200_OK
         data = response.json()
         assert data["name"] == "Tech"
@@ -106,11 +106,11 @@ class TestGetWatchlist:
         assert data["items"][0]["symbol"] == "2330"
 
     def test_get_not_found(self, auth_client):
-        response = auth_client.get("/watchlists/9999")
+        response = auth_client.get("/api/v1/watchlists/9999")
         assert response.status_code == status.HTTP_404_NOT_FOUND
 
     def test_get_other_users_watchlist(self, auth_client, client):
-        create_resp = auth_client.post("/watchlists", json={"name": "Private"})
+        create_resp = auth_client.post("/api/v1/watchlists", json={"name": "Private"})
         wl_id = create_resp.json()["id"]
 
         register_user(client, username="user2", email="user2@example.com")
@@ -118,7 +118,7 @@ class TestGetWatchlist:
         token = login_resp.json()["access_token"]
         client.headers.update({"Authorization": f"Bearer {token}"})
 
-        response = client.get(f"/watchlists/{wl_id}")
+        response = client.get(f"/api/v1/watchlists/{wl_id}")
         assert response.status_code == status.HTTP_404_NOT_FOUND
 
 
@@ -126,22 +126,22 @@ class TestGetWatchlist:
 
 class TestDeleteWatchlist:
     def test_delete_success(self, auth_client):
-        create_resp = auth_client.post("/watchlists", json={"name": "To Delete"})
+        create_resp = auth_client.post("/api/v1/watchlists", json={"name": "To Delete"})
         wl_id = create_resp.json()["id"]
 
-        response = auth_client.delete(f"/watchlists/{wl_id}")
+        response = auth_client.delete(f"/api/v1/watchlists/{wl_id}")
         assert response.status_code == status.HTTP_200_OK
         assert "deleted" in response.json()["message"]
 
-        get_resp = auth_client.get(f"/watchlists/{wl_id}")
+        get_resp = auth_client.get(f"/api/v1/watchlists/{wl_id}")
         assert get_resp.status_code == status.HTTP_404_NOT_FOUND
 
     def test_delete_not_found(self, auth_client):
-        response = auth_client.delete("/watchlists/9999")
+        response = auth_client.delete("/api/v1/watchlists/9999")
         assert response.status_code == status.HTTP_404_NOT_FOUND
 
     def test_delete_other_users_watchlist(self, auth_client, client):
-        create_resp = auth_client.post("/watchlists", json={"name": "Private"})
+        create_resp = auth_client.post("/api/v1/watchlists", json={"name": "Private"})
         wl_id = create_resp.json()["id"]
 
         register_user(client, username="user2", email="user2@example.com")
@@ -149,7 +149,7 @@ class TestDeleteWatchlist:
         token = login_resp.json()["access_token"]
         client.headers.update({"Authorization": f"Bearer {token}"})
 
-        response = client.delete(f"/watchlists/{wl_id}")
+        response = client.delete(f"/api/v1/watchlists/{wl_id}")
         assert response.status_code == status.HTTP_404_NOT_FOUND
 
 
@@ -157,33 +157,33 @@ class TestDeleteWatchlist:
 
 class TestAddWatchlistItem:
     def test_add_success(self, auth_client, sample_stocks):
-        create_resp = auth_client.post("/watchlists", json={"name": "Tech"})
+        create_resp = auth_client.post("/api/v1/watchlists", json={"name": "Tech"})
         wl_id = create_resp.json()["id"]
 
-        response = auth_client.post(f"/watchlists/{wl_id}/items", json={"symbol": "2330"})
+        response = auth_client.post(f"/api/v1/watchlists/{wl_id}/items", json={"symbol": "2330"})
         assert response.status_code == status.HTTP_200_OK
         data = response.json()
         assert len(data["items"]) == 1
         assert data["items"][0]["symbol"] == "2330"
 
     def test_add_duplicate(self, auth_client, sample_stocks):
-        create_resp = auth_client.post("/watchlists", json={"name": "Tech"})
+        create_resp = auth_client.post("/api/v1/watchlists", json={"name": "Tech"})
         wl_id = create_resp.json()["id"]
 
-        auth_client.post(f"/watchlists/{wl_id}/items", json={"symbol": "2330"})
-        response = auth_client.post(f"/watchlists/{wl_id}/items", json={"symbol": "2330"})
+        auth_client.post(f"/api/v1/watchlists/{wl_id}/items", json={"symbol": "2330"})
+        response = auth_client.post(f"/api/v1/watchlists/{wl_id}/items", json={"symbol": "2330"})
         assert response.status_code == status.HTTP_409_CONFLICT
         assert "already in watchlist" in response.json()["detail"]
 
     def test_add_stock_not_found(self, auth_client):
-        create_resp = auth_client.post("/watchlists", json={"name": "Tech"})
+        create_resp = auth_client.post("/api/v1/watchlists", json={"name": "Tech"})
         wl_id = create_resp.json()["id"]
 
-        response = auth_client.post(f"/watchlists/{wl_id}/items", json={"symbol": "9999"})
+        response = auth_client.post(f"/api/v1/watchlists/{wl_id}/items", json={"symbol": "9999"})
         assert response.status_code == status.HTTP_404_NOT_FOUND
 
     def test_add_to_other_users_watchlist(self, auth_client, client, sample_stocks):
-        create_resp = auth_client.post("/watchlists", json={"name": "Private"})
+        create_resp = auth_client.post("/api/v1/watchlists", json={"name": "Private"})
         wl_id = create_resp.json()["id"]
 
         register_user(client, username="user2", email="user2@example.com")
@@ -191,7 +191,7 @@ class TestAddWatchlistItem:
         token = login_resp.json()["access_token"]
         client.headers.update({"Authorization": f"Bearer {token}"})
 
-        response = client.post(f"/watchlists/{wl_id}/items", json={"symbol": "2330"})
+        response = client.post(f"/api/v1/watchlists/{wl_id}/items", json={"symbol": "2330"})
         assert response.status_code == status.HTTP_404_NOT_FOUND
 
 
@@ -199,28 +199,28 @@ class TestAddWatchlistItem:
 
 class TestRemoveWatchlistItem:
     def test_remove_success(self, auth_client, sample_stocks):
-        create_resp = auth_client.post("/watchlists", json={"name": "Tech"})
+        create_resp = auth_client.post("/api/v1/watchlists", json={"name": "Tech"})
         wl_id = create_resp.json()["id"]
-        auth_client.post(f"/watchlists/{wl_id}/items", json={"symbol": "2330"})
+        auth_client.post(f"/api/v1/watchlists/{wl_id}/items", json={"symbol": "2330"})
 
-        response = auth_client.delete(f"/watchlists/{wl_id}/items/2330")
+        response = auth_client.delete(f"/api/v1/watchlists/{wl_id}/items/2330")
         assert response.status_code == status.HTTP_200_OK
         data = response.json()
         assert len(data["items"]) == 0
 
     def test_remove_stock_not_in_watchlist(self, auth_client, sample_stocks):
-        create_resp = auth_client.post("/watchlists", json={"name": "Tech"})
+        create_resp = auth_client.post("/api/v1/watchlists", json={"name": "Tech"})
         wl_id = create_resp.json()["id"]
 
-        response = auth_client.delete(f"/watchlists/{wl_id}/items/2330")
+        response = auth_client.delete(f"/api/v1/watchlists/{wl_id}/items/2330")
         assert response.status_code == status.HTTP_404_NOT_FOUND
         assert "not found in watchlist" in response.json()["detail"]
 
     def test_remove_stock_not_found(self, auth_client):
-        create_resp = auth_client.post("/watchlists", json={"name": "Tech"})
+        create_resp = auth_client.post("/api/v1/watchlists", json={"name": "Tech"})
         wl_id = create_resp.json()["id"]
 
-        response = auth_client.delete(f"/watchlists/{wl_id}/items/9999")
+        response = auth_client.delete(f"/api/v1/watchlists/{wl_id}/items/9999")
         assert response.status_code == status.HTTP_404_NOT_FOUND
 
 
@@ -243,11 +243,11 @@ class TestWatchlistQuotes:
             },
         }
 
-        create_resp = auth_client.post("/watchlists", json={"name": "Tech"})
+        create_resp = auth_client.post("/api/v1/watchlists", json={"name": "Tech"})
         wl_id = create_resp.json()["id"]
-        auth_client.post(f"/watchlists/{wl_id}/items", json={"symbol": "2330"})
+        auth_client.post(f"/api/v1/watchlists/{wl_id}/items", json={"symbol": "2330"})
 
-        response = auth_client.get(f"/watchlists/{wl_id}/quotes")
+        response = auth_client.get(f"/api/v1/watchlists/{wl_id}/quotes")
         assert response.status_code == status.HTTP_200_OK
         data = response.json()
         assert data["id"] == wl_id
@@ -259,25 +259,25 @@ class TestWatchlistQuotes:
     def test_get_quotes_source_failure_ignored(self, mock_get, auth_client, sample_stocks):
         mock_get.return_value = {"success": False}
 
-        create_resp = auth_client.post("/watchlists", json={"name": "Tech"})
+        create_resp = auth_client.post("/api/v1/watchlists", json={"name": "Tech"})
         wl_id = create_resp.json()["id"]
-        auth_client.post(f"/watchlists/{wl_id}/items", json={"symbol": "2330"})
+        auth_client.post(f"/api/v1/watchlists/{wl_id}/items", json={"symbol": "2330"})
 
-        response = auth_client.get(f"/watchlists/{wl_id}/quotes")
+        response = auth_client.get(f"/api/v1/watchlists/{wl_id}/quotes")
         assert response.status_code == status.HTTP_200_OK
         data = response.json()
         assert data["quotes"] == []
 
     def test_get_quotes_not_found(self, auth_client):
-        response = auth_client.get("/watchlists/9999/quotes")
+        response = auth_client.get("/api/v1/watchlists/9999/quotes")
         assert response.status_code == status.HTTP_404_NOT_FOUND
 
     @patch("app.services.stock_data.twstock.realtime.get")
     def test_get_quotes_empty_watchlist(self, mock_get, auth_client):
-        create_resp = auth_client.post("/watchlists", json={"name": "Empty"})
+        create_resp = auth_client.post("/api/v1/watchlists", json={"name": "Empty"})
         wl_id = create_resp.json()["id"]
 
-        response = auth_client.get(f"/watchlists/{wl_id}/quotes")
+        response = auth_client.get(f"/api/v1/watchlists/{wl_id}/quotes")
         assert response.status_code == status.HTTP_200_OK
         data = response.json()
         assert data["quotes"] == []
@@ -302,12 +302,12 @@ class TestWatchlistQuotes:
             {"success": False},
         ]
 
-        create_resp = auth_client.post("/watchlists", json={"name": "Tech"})
+        create_resp = auth_client.post("/api/v1/watchlists", json={"name": "Tech"})
         wl_id = create_resp.json()["id"]
-        auth_client.post(f"/watchlists/{wl_id}/items", json={"symbol": "2330"})
-        auth_client.post(f"/watchlists/{wl_id}/items", json={"symbol": "2317"})
+        auth_client.post(f"/api/v1/watchlists/{wl_id}/items", json={"symbol": "2330"})
+        auth_client.post(f"/api/v1/watchlists/{wl_id}/items", json={"symbol": "2317"})
 
-        response = auth_client.get(f"/watchlists/{wl_id}/quotes")
+        response = auth_client.get(f"/api/v1/watchlists/{wl_id}/quotes")
         assert response.status_code == status.HTTP_200_OK
         data = response.json()
         assert len(data["quotes"]) == 1

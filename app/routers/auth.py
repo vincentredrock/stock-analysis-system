@@ -81,7 +81,7 @@ def login(credentials: LoginRequest, db: Session = Depends(get_db)):
 
 @router.post("/logout", response_model=MessageResponse)
 def logout(
-    token: str = Depends(OAuth2PasswordBearer(tokenUrl="/auth/login")),
+    token: str = Depends(OAuth2PasswordBearer(tokenUrl="/api/v1/auth/login")),
     db: Session = Depends(get_db),
 ):
     payload = decode_token(token)

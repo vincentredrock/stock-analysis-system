@@ -126,33 +126,33 @@ The FastAPI backend will automatically serve the built frontend from `frontend/d
 
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| POST | `/auth/register` | Register a new user |
-| POST | `/auth/login` | Login and get tokens |
-| POST | `/auth/logout` | Logout and blacklist token |
-| POST | `/auth/refresh` | Refresh access token |
-| GET | `/auth/me` | Get current user profile |
+| POST | `/api/v1/auth/register` | Register a new user |
+| POST | `/api/v1/auth/login` | Login and get tokens |
+| POST | `/api/v1/auth/logout` | Logout and blacklist token |
+| POST | `/api/v1/auth/refresh` | Refresh access token |
+| GET | `/api/v1/auth/me` | Get current user profile |
 
 ### Stocks
 
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| GET | `/stocks/search?q={query}` | Search stocks by symbol/name |
-| GET | `/stocks` | List all stocks (paginated) |
-| GET | `/stocks/{symbol}/quote` | Get real-time quote |
-| GET | `/stocks/{symbol}/history` | Get historical prices |
-| POST | `/stocks/{symbol}/sync` | Trigger historical price sync |
+| GET | `/api/v1/stocks/search?q={query}` | Search stocks by symbol/name |
+| GET | `/api/v1/stocks` | List all stocks (paginated) |
+| GET | `/api/v1/stocks/{symbol}/quote` | Get real-time quote |
+| GET | `/api/v1/stocks/{symbol}/history` | Get historical prices |
+| POST | `/api/v1/stocks/{symbol}/sync` | Trigger historical price sync |
 
 ### Watchlists
 
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| GET | `/watchlists` | List user's watchlists |
-| POST | `/watchlists` | Create a watchlist |
-| GET | `/watchlists/{id}` | Get watchlist details |
-| DELETE | `/watchlists/{id}` | Delete a watchlist |
-| POST | `/watchlists/{id}/items` | Add stock to watchlist |
-| DELETE | `/watchlists/{id}/items/{symbol}` | Remove stock from watchlist |
-| GET | `/watchlists/{id}/quotes` | Get quotes for watchlist stocks |
+| GET | `/api/v1/watchlists` | List user's watchlists |
+| POST | `/api/v1/watchlists` | Create a watchlist |
+| GET | `/api/v1/watchlists/{id}` | Get watchlist details |
+| DELETE | `/api/v1/watchlists/{id}` | Delete a watchlist |
+| POST | `/api/v1/watchlists/{id}/items` | Add stock to watchlist |
+| DELETE | `/api/v1/watchlists/{id}/items/{symbol}` | Remove stock from watchlist |
+| GET | `/api/v1/watchlists/{id}/quotes` | Get quotes for watchlist stocks |
 
 ## Testing
 
@@ -187,6 +187,14 @@ All configuration is managed through environment variables in `.env`:
 | `STOCK_DAILY_SYNC_ENABLED` | true | Enable daily price sync |
 | `STOCK_DAILY_SYNC_HOUR` | 16 | Daily sync hour (24h) |
 | `STOCK_DAILY_SYNC_MINUTE` | 30 | Daily sync minute |
+
+Frontend builds use these Vite variables:
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `VITE_API_ORIGIN` | same origin | Backend origin, for example `https://backend.example.com` |
+| `VITE_API_PREFIX` | `/api/v1` | API path prefix appended to `VITE_API_ORIGIN` |
+| `VITE_API_URL` | — | Backward-compatible API base. If it omits `/api/v1`, the frontend appends `VITE_API_PREFIX`. |
 
 ## Tech Stack
 

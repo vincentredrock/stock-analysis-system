@@ -74,7 +74,7 @@ def client(db_session):
 # ─── Auth Helpers ─────────────────────────────────────────
 
 def register_user(client, username="testuser", email="test@example.com", password="Password123!"):
-    return client.post("/auth/register", json={
+    return client.post("/api/v1/auth/register", json={
         "username": username,
         "email": email,
         "password": password,
@@ -82,7 +82,7 @@ def register_user(client, username="testuser", email="test@example.com", passwor
 
 
 def login_user(client, username="testuser", password="Password123!"):
-    return client.post("/auth/login", json={
+    return client.post("/api/v1/auth/login", json={
         "username": username,
         "password": password,
     })

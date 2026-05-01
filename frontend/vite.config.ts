@@ -14,9 +14,7 @@ export default defineConfig({
   server: {
     port: 5173,
     proxy: {
-      '/auth': { target: 'http://localhost:8000', changeOrigin: true },
-      '/stocks': { target: 'http://localhost:8000', changeOrigin: true },
-      '/watchlists': { target: 'http://localhost:8000', changeOrigin: true },
+      '/api': { target: 'http://localhost:8000', changeOrigin: true },
       '/health': { target: 'http://localhost:8000', changeOrigin: true },
     },
   },

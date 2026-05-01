@@ -1,7 +1,27 @@
 import axios from "axios";
 import type { TokenPair } from "@/types";
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || "";
+const API_PREFIX = normalizePath(import.meta.env.VITE_API_PREFIX || "/api/v1");
+const API_BASE_URL = resolveApiBaseUrl();
+
+function trimTrailingSlash(value: string) {
+  return value.replace(/\/+$/, "");
+}
+
+function normalizePath(value: string) {
+  const path = `/${value}`.replace(/\/+/g, "/");
+  return trimTrailingSlash(path);
+}
+
+function resolveApiBaseUrl() {
+  const apiUrl = trimTrailingSlash(import.meta.env.VITE_API_URL || "");
+  if (apiUrl) {
+    return apiUrl.endsWith(API_PREFIX) ? apiUrl : `${apiUrl}${API_PREFIX}`;
+  }
+
+  const apiOrigin = trimTrailingSlash(import.meta.env.VITE_API_ORIGIN || "");
+  return `${apiOrigin}${API_PREFIX}`;
+}
 
 export const apiClient = axios.create({
   baseURL: API_BASE_URL,
