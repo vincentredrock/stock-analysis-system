@@ -32,9 +32,13 @@ def test_rest_api_route_inventory():
         "/api/v1/watchlists/{watchlist_id}/items/{symbol}": {"PUT", "DELETE"},
         "/api/v1/watchlists/{watchlist_id}/quotes": {"GET"},
     }
+    api_v1_routes = {
+        path: methods
+        for path, methods in routes.items()
+        if path.startswith("/api/v1")
+    }
 
-    for path, methods in expected.items():
-        assert routes[path] == methods
+    assert api_v1_routes == expected
 
 
 def test_legacy_action_routes_are_not_registered():
