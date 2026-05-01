@@ -3,7 +3,7 @@ import type {
   Stock,
   StockPrice,
   StockQuote,
-  StockSyncResult,
+  StockSyncJob,
   StockSyncStatus,
 } from "@/types";
 
@@ -44,9 +44,11 @@ export async function syncStockPrices(
   symbol: string,
   start?: string,
   end?: string
-): Promise<StockSyncResult> {
-  const res = await apiClient.post<StockSyncResult>(`/stocks/${symbol}/sync`, null, {
-    params: { start, end },
+): Promise<StockSyncJob> {
+  const res = await apiClient.post<StockSyncJob>("/stock-sync-jobs", {
+    symbol,
+    start,
+    end,
   });
   return res.data;
 }

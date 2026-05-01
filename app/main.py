@@ -32,6 +32,7 @@ app.add_middleware(
 # Routers
 app.include_router(auth.router, prefix=API_V1_PREFIX)
 app.include_router(stocks.router, prefix=API_V1_PREFIX)
+app.include_router(stocks.sync_jobs_router, prefix=API_V1_PREFIX)
 app.include_router(watchlists.router, prefix=API_V1_PREFIX)
 
 

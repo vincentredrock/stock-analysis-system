@@ -116,7 +116,11 @@ export function StockDetailPage() {
   const syncMutation = useMutation({
     mutationFn: () => syncStockPrices(symbol!, startDate || undefined, endDate || undefined),
     onSuccess: (data) => {
-      toast.success(data.message);
+      if (data.status === "failed") {
+        toast.error(data.error || "Sync failed");
+      } else {
+        toast.success(data.message || "Sync completed");
+      }
       queryClient.invalidateQueries({ queryKey: ["stock-history", symbol] });
       queryClient.invalidateQueries({ queryKey: ["stock-sync-status", symbol] });
     },

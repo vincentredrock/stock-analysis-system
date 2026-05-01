@@ -5,7 +5,7 @@ from unittest.mock import patch
 import pytest
 from fastapi import status
 
-from app.models import Stock, StockPrice
+from app.models import Stock, StockPrice, StockSyncJob
 from tests.conftest import login_user, register_user
 
 
@@ -29,7 +29,7 @@ class TestStocksAuth:
         assert response.status_code == status.HTTP_401_UNAUTHORIZED
 
     def test_sync_requires_auth(self, client):
-        response = client.post("/api/v1/stocks/2330/sync")
+        response = client.post("/api/v1/stock-sync-jobs", json={"symbol": "2330"})
         assert response.status_code == status.HTTP_401_UNAUTHORIZED
 
 
@@ -318,9 +318,20 @@ class TestStockSync:
         ]
         mock_instance.fetch.return_value = mock_instance.data
 
-        response = auth_client.post("/api/v1/stocks/2330/sync?start=2024-01-01&end=2024-01-31")
-        assert response.status_code == status.HTTP_200_OK
-        assert "Synced 1 price records for 2330" in response.json()["message"]
+        response = auth_client.post(
+            "/api/v1/stock-sync-jobs",
+            json={"symbol": "2330", "start": "2024-01-01", "end": "2024-01-31"},
+        )
+        assert response.status_code == status.HTTP_201_CREATED
+        assert response.headers["location"].startswith("/api/v1/stock-sync-jobs/")
+        data = response.json()
+        assert data["status"] == "success"
+        assert "Synced 1 price records for 2330" in data["message"]
+        assert data["records_upserted"] == 1
+
+        job_response = auth_client.get(response.headers["location"])
+        assert job_response.status_code == status.HTTP_200_OK
+        assert job_response.json()["id"] == data["id"]
 
     @patch("app.services.stock_data.twstock.Stock")
     def test_sync_ignores_duplicate_prices(self, mock_stock_class, auth_client, sample_stocks, db_session):
@@ -381,8 +392,11 @@ class TestStockSync:
         ]
         mock_instance.fetch.return_value = mock_instance.data
 
-        response = auth_client.post("/api/v1/stocks/2330/sync?start=2024-01-01&end=2024-01-31")
-        assert response.status_code == status.HTTP_200_OK
+        response = auth_client.post(
+            "/api/v1/stock-sync-jobs",
+            json={"symbol": "2330", "start": "2024-01-01", "end": "2024-01-31"},
+        )
+        assert response.status_code == status.HTTP_201_CREATED
         assert "Synced 2 price records for 2330" in response.json()["message"]
         assert response.json()["records_skipped"] == 1
         assert db_session.query(StockPrice).filter(StockPrice.stock_id == stock.id).count() == 2
@@ -393,20 +407,31 @@ class TestStockSync:
         assert response.json()["status"] == "pending"
 
     def test_sync_stock_not_found(self, auth_client):
-        response = auth_client.post("/api/v1/stocks/9999/sync")
+        response = auth_client.post("/api/v1/stock-sync-jobs", json={"symbol": "9999"})
         assert response.status_code == status.HTTP_404_NOT_FOUND
 
-    @patch("app.routers.stocks.sync_historical_prices")
-    def test_sync_bad_date_range(self, mock_sync, auth_client, sample_stocks):
-        mock_sync.side_effect = ValueError("Start date cannot be after end date")
-        response = auth_client.post("/api/v1/stocks/2330/sync?start=2024-02-01&end=2024-01-01")
+    def test_sync_bad_date_range(self, auth_client, sample_stocks):
+        response = auth_client.post(
+            "/api/v1/stock-sync-jobs",
+            json={"symbol": "2330", "start": "2024-02-01", "end": "2024-01-01"},
+        )
         assert response.status_code == status.HTTP_400_BAD_REQUEST
 
     @patch("app.routers.stocks.sync_historical_prices")
-    def test_sync_generic_exception(self, mock_sync, auth_client, sample_stocks):
+    def test_sync_generic_exception(self, mock_sync, auth_client, sample_stocks, db_session):
         mock_sync.side_effect = Exception("Network failure")
-        response = auth_client.post("/api/v1/stocks/2330/sync")
-        assert response.status_code == status.HTTP_503_SERVICE_UNAVAILABLE
+        response = auth_client.post("/api/v1/stock-sync-jobs", json={"symbol": "2330"})
+        assert response.status_code == status.HTTP_201_CREATED
+        assert response.json()["status"] == "failed"
+        assert "Network failure" in response.json()["error"]
+
+        job = db_session.query(StockSyncJob).filter(StockSyncJob.id == response.json()["id"]).first()
+        assert job is not None
+        assert job.status == "failed"
+
+    def test_get_sync_job_not_found(self, auth_client):
+        response = auth_client.get("/api/v1/stock-sync-jobs/9999")
+        assert response.status_code == status.HTTP_404_NOT_FOUND
 
 
 class TestStockSyncStatus:
@@ -443,6 +468,7 @@ class TestLegacyStockRoutes:
             "/api/v1/stocks/search?q=2330",
             "/api/v1/stocks/2330/quote",
             "/api/v1/stocks/2330/history",
+            "/api/v1/stocks/2330/sync",
         ],
     )
     def test_action_oriented_stock_routes_are_removed(self, auth_client, path):

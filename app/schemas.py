@@ -119,14 +119,26 @@ class StockSyncStatusRead(BaseModel):
     records_upserted: int
 
 
-class StockSyncResultRead(BaseModel):
-    message: str
+class StockSyncJobCreate(BaseModel):
     symbol: str
-    start: date
-    end: date
+    start: Optional[date] = None
+    end: Optional[date] = None
+
+
+class StockSyncJobRead(BaseModel):
+    id: int
+    symbol: str
+    status: str
+    start: Optional[date] = None
+    end: Optional[date] = None
+    message: Optional[str] = None
+    error: Optional[str] = None
     records_upserted: int
     records_skipped: int
     months_requested: int
+    created_at: datetime
+    started_at: Optional[datetime] = None
+    completed_at: Optional[datetime] = None
 
 
 class StockQuoteRead(BaseModel):

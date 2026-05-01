@@ -140,7 +140,9 @@ The FastAPI backend will automatically serve the built frontend from `frontend/d
 | GET | `/api/v1/stocks/{symbol}` | Get stock details |
 | GET | `/api/v1/stocks/{symbol}/quotes/latest` | Get latest quote |
 | GET | `/api/v1/stocks/{symbol}/prices` | Get historical prices |
-| POST | `/api/v1/stocks/{symbol}/sync` | Trigger historical price sync |
+| GET | `/api/v1/stocks/{symbol}/sync-status` | Get historical price sync status |
+| POST | `/api/v1/stock-sync-jobs` | Create a historical price sync job |
+| GET | `/api/v1/stock-sync-jobs/{id}` | Get a historical price sync job |
 
 ### Watchlists
 
