@@ -1,12 +1,15 @@
 import os
 
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 
 from app.config import settings
 from app.routers import auth, stocks, watchlists
 from app.scheduler import start_scheduler, stop_scheduler
+
+
+API_V1_PREFIX = "/api/v1"
 
 
 app = FastAPI(
@@ -27,13 +30,16 @@ app.add_middleware(
 )
 
 # Routers
-app.include_router(auth.router)
-app.include_router(stocks.router)
-app.include_router(watchlists.router)
+app.include_router(auth.router, prefix=API_V1_PREFIX)
+app.include_router(stocks.router, prefix=API_V1_PREFIX)
+app.include_router(stocks.sync_jobs_router, prefix=API_V1_PREFIX)
+app.include_router(watchlists.router, prefix=API_V1_PREFIX)
 
 
 @app.on_event("startup")
 def startup_event():
+    if settings.environment == "test" or not settings.stock_daily_sync_enabled:
+        return
     start_scheduler()
 
 
@@ -45,6 +51,15 @@ def shutdown_event():
 @app.get("/health", tags=["Health"])
 def health_check():
     return {"status": "healthy"}
+
+
+@app.api_route("/api", methods=["GET", "POST", "PUT", "PATCH", "DELETE"], include_in_schema=False)
+@app.api_route("/api/{full_path:path}", methods=["GET", "POST", "PUT", "PATCH", "DELETE"], include_in_schema=False)
+async def api_not_found(full_path: str = ""):
+    raise HTTPException(
+        status_code=status.HTTP_404_NOT_FOUND,
+        detail="API endpoint not found",
+    )
 
 
 # Serve built frontend (SPA fallback)

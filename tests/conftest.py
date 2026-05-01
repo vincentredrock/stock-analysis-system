@@ -4,6 +4,10 @@ import sys
 # Ensure project root is on path before any app imports
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 
+# Keep application startup deterministic under pytest.
+os.environ["DEBUG"] = "false"
+os.environ["STOCK_DAILY_SYNC_ENABLED"] = "false"
+
 import pytest
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
@@ -74,7 +78,7 @@ def client(db_session):
 # ─── Auth Helpers ─────────────────────────────────────────
 
 def register_user(client, username="testuser", email="test@example.com", password="Password123!"):
-    return client.post("/auth/register", json={
+    return client.post("/api/v1/users", json={
         "username": username,
         "email": email,
         "password": password,
@@ -82,7 +86,7 @@ def register_user(client, username="testuser", email="test@example.com", passwor
 
 
 def login_user(client, username="testuser", password="Password123!"):
-    return client.post("/auth/login", json={
+    return client.post("/api/v1/sessions", json={
         "username": username,
         "password": password,
     })

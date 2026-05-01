@@ -1,17 +1,16 @@
 from typing import List
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Response, status
 from sqlalchemy.orm import Session
 
 from app.database import get_db
 from app.dependencies import get_current_active_user
 from app.models import Stock, User, Watchlist, WatchlistItem
 from app.schemas import (
-    MessageResponse,
     StockQuoteRead,
     WatchlistCreate,
-    WatchlistItemCreate,
     WatchlistRead,
+    WatchlistUpdate,
     WatchlistWithQuotesRead,
 )
 from app.services.stock_data import async_get_realtime_quote
@@ -99,7 +98,32 @@ def get_watchlist(
     )
 
 
-@router.delete("/{watchlist_id}", response_model=MessageResponse)
+@router.patch("/{watchlist_id}", response_model=WatchlistRead)
+def update_watchlist(
+    watchlist_id: int,
+    watchlist_in: WatchlistUpdate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+):
+    """Update a watchlist resource."""
+    watchlist = _get_watchlist_or_404(db, watchlist_id, current_user.id)
+    if watchlist_in.name is not None:
+        watchlist.name = watchlist_in.name
+
+    db.commit()
+    db.refresh(watchlist)
+    items = [item.stock for item in watchlist.items]
+    return WatchlistRead(
+        id=watchlist.id,
+        name=watchlist.name,
+        user_id=watchlist.user_id,
+        items=items,
+        created_at=watchlist.created_at,
+        updated_at=watchlist.updated_at,
+    )
+
+
+@router.delete("/{watchlist_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_watchlist(
     watchlist_id: int,
     db: Session = Depends(get_db),
@@ -109,42 +133,39 @@ def delete_watchlist(
     watchlist = _get_watchlist_or_404(db, watchlist_id, current_user.id)
     db.delete(watchlist)
     db.commit()
-    return MessageResponse(message="Watchlist deleted successfully")
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
-@router.post("/{watchlist_id}/items", response_model=WatchlistRead)
-def add_watchlist_item(
+@router.put("/{watchlist_id}/items/{symbol}", response_model=WatchlistRead)
+def put_watchlist_item(
     watchlist_id: int,
-    item_in: WatchlistItemCreate,
+    symbol: str,
+    response: Response,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_user),
 ):
-    """Add a stock to a watchlist."""
+    """Ensure a stock exists in a watchlist."""
     watchlist = _get_watchlist_or_404(db, watchlist_id, current_user.id)
 
-    stock = db.query(Stock).filter(Stock.symbol == item_in.symbol).first()
+    stock = db.query(Stock).filter(Stock.symbol == symbol).first()
     if not stock:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Stock {item_in.symbol} not found",
+            detail=f"Stock {symbol} not found",
         )
 
-    # Check if already in watchlist
     existing = (
         db.query(WatchlistItem)
         .filter(WatchlistItem.watchlist_id == watchlist.id, WatchlistItem.stock_id == stock.id)
         .first()
     )
-    if existing:
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail="Stock already in watchlist",
-        )
-
-    item = WatchlistItem(watchlist_id=watchlist.id, stock_id=stock.id)
-    db.add(item)
-    db.commit()
-    db.refresh(watchlist)
+    if not existing:
+        item = WatchlistItem(watchlist_id=watchlist.id, stock_id=stock.id)
+        db.add(item)
+        db.commit()
+        db.refresh(watchlist)
+        response.status_code = status.HTTP_201_CREATED
+        response.headers["Location"] = f"/api/v1/watchlists/{watchlist_id}/items/{symbol}"
 
     items = [i.stock for i in watchlist.items]
     return WatchlistRead(
@@ -157,7 +178,7 @@ def add_watchlist_item(
     )
 
 
-@router.delete("/{watchlist_id}/items/{symbol}", response_model=WatchlistRead)
+@router.delete("/{watchlist_id}/items/{symbol}", status_code=status.HTTP_204_NO_CONTENT)
 def remove_watchlist_item(
     watchlist_id: int,
     symbol: str,
@@ -187,17 +208,7 @@ def remove_watchlist_item(
 
     db.delete(item)
     db.commit()
-    db.refresh(watchlist)
-
-    items = [i.stock for i in watchlist.items]
-    return WatchlistRead(
-        id=watchlist.id,
-        name=watchlist.name,
-        user_id=watchlist.user_id,
-        items=items,
-        created_at=watchlist.created_at,
-        updated_at=watchlist.updated_at,
-    )
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
 @router.get("/{watchlist_id}/quotes", response_model=WatchlistWithQuotesRead)

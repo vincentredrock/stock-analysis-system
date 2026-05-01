@@ -53,6 +53,7 @@ class Stock(Base):
 
     prices = relationship("StockPrice", back_populates="stock", cascade="all, delete-orphan")
     sync_status = relationship("StockSyncStatus", back_populates="stock", uselist=False, cascade="all, delete-orphan")
+    sync_jobs = relationship("StockSyncJob", back_populates="stock", cascade="all, delete-orphan")
     watchlist_items = relationship("WatchlistItem", back_populates="stock", cascade="all, delete-orphan")
 
 
@@ -94,6 +95,27 @@ class StockSyncStatus(Base):
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)
 
     stock = relationship("Stock", back_populates="sync_status")
+
+
+class StockSyncJob(Base):
+    __tablename__ = "stock_sync_jobs"
+
+    id = Column(Integer, primary_key=True, index=True)
+    stock_id = Column(Integer, ForeignKey("stocks.id"), nullable=False)
+    status = Column(String(20), default="pending", nullable=False)
+    requested_from = Column(Date, nullable=True)
+    requested_to = Column(Date, nullable=True)
+    started_at = Column(DateTime(timezone=True), nullable=True)
+    completed_at = Column(DateTime(timezone=True), nullable=True)
+    message = Column(String(500), nullable=True)
+    last_error = Column(String(500), nullable=True)
+    records_upserted = Column(Integer, default=0, nullable=False)
+    records_skipped = Column(Integer, default=0, nullable=False)
+    months_requested = Column(Integer, default=0, nullable=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)
+
+    stock = relationship("Stock", back_populates="sync_jobs")
 
 
 class Watchlist(Base):
