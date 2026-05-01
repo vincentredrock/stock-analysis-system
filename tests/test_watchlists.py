@@ -27,7 +27,7 @@ class TestWatchlistsAuth:
         assert response.status_code == status.HTTP_401_UNAUTHORIZED
 
     def test_add_item_requires_auth(self, client):
-        response = client.post("/api/v1/watchlists/1/items", json={"symbol": "2330"})
+        response = client.put("/api/v1/watchlists/1/items/2330")
         assert response.status_code == status.HTTP_401_UNAUTHORIZED
 
     def test_remove_item_requires_auth(self, client):
@@ -96,7 +96,7 @@ class TestGetWatchlist:
         create_resp = auth_client.post("/api/v1/watchlists", json={"name": "Tech"})
         wl_id = create_resp.json()["id"]
 
-        auth_client.post(f"/api/v1/watchlists/{wl_id}/items", json={"symbol": "2330"})
+        auth_client.put(f"/api/v1/watchlists/{wl_id}/items/2330")
 
         response = auth_client.get(f"/api/v1/watchlists/{wl_id}")
         assert response.status_code == status.HTTP_200_OK
@@ -130,8 +130,8 @@ class TestDeleteWatchlist:
         wl_id = create_resp.json()["id"]
 
         response = auth_client.delete(f"/api/v1/watchlists/{wl_id}")
-        assert response.status_code == status.HTTP_200_OK
-        assert "deleted" in response.json()["message"]
+        assert response.status_code == status.HTTP_204_NO_CONTENT
+        assert response.content == b""
 
         get_resp = auth_client.get(f"/api/v1/watchlists/{wl_id}")
         assert get_resp.status_code == status.HTTP_404_NOT_FOUND
@@ -153,6 +153,27 @@ class TestDeleteWatchlist:
         assert response.status_code == status.HTTP_404_NOT_FOUND
 
 
+class TestUpdateWatchlist:
+    def test_update_name(self, auth_client):
+        create_resp = auth_client.post("/api/v1/watchlists", json={"name": "Old Name"})
+        wl_id = create_resp.json()["id"]
+
+        response = auth_client.patch(f"/api/v1/watchlists/{wl_id}", json={"name": "New Name"})
+        assert response.status_code == status.HTTP_200_OK
+        assert response.json()["name"] == "New Name"
+
+    def test_update_empty_name(self, auth_client):
+        create_resp = auth_client.post("/api/v1/watchlists", json={"name": "Old Name"})
+        wl_id = create_resp.json()["id"]
+
+        response = auth_client.patch(f"/api/v1/watchlists/{wl_id}", json={"name": ""})
+        assert response.status_code == status.HTTP_422_UNPROCESSABLE_ENTITY
+
+    def test_update_not_found(self, auth_client):
+        response = auth_client.patch("/api/v1/watchlists/9999", json={"name": "New Name"})
+        assert response.status_code == status.HTTP_404_NOT_FOUND
+
+
 # ─── Add Item ─────────────────────────────────────────────
 
 class TestAddWatchlistItem:
@@ -160,8 +181,9 @@ class TestAddWatchlistItem:
         create_resp = auth_client.post("/api/v1/watchlists", json={"name": "Tech"})
         wl_id = create_resp.json()["id"]
 
-        response = auth_client.post(f"/api/v1/watchlists/{wl_id}/items", json={"symbol": "2330"})
-        assert response.status_code == status.HTTP_200_OK
+        response = auth_client.put(f"/api/v1/watchlists/{wl_id}/items/2330")
+        assert response.status_code == status.HTTP_201_CREATED
+        assert response.headers["location"] == f"/api/v1/watchlists/{wl_id}/items/2330"
         data = response.json()
         assert len(data["items"]) == 1
         assert data["items"][0]["symbol"] == "2330"
@@ -170,16 +192,16 @@ class TestAddWatchlistItem:
         create_resp = auth_client.post("/api/v1/watchlists", json={"name": "Tech"})
         wl_id = create_resp.json()["id"]
 
-        auth_client.post(f"/api/v1/watchlists/{wl_id}/items", json={"symbol": "2330"})
-        response = auth_client.post(f"/api/v1/watchlists/{wl_id}/items", json={"symbol": "2330"})
-        assert response.status_code == status.HTTP_409_CONFLICT
-        assert "already in watchlist" in response.json()["detail"]
+        auth_client.put(f"/api/v1/watchlists/{wl_id}/items/2330")
+        response = auth_client.put(f"/api/v1/watchlists/{wl_id}/items/2330")
+        assert response.status_code == status.HTTP_200_OK
+        assert len(response.json()["items"]) == 1
 
     def test_add_stock_not_found(self, auth_client):
         create_resp = auth_client.post("/api/v1/watchlists", json={"name": "Tech"})
         wl_id = create_resp.json()["id"]
 
-        response = auth_client.post(f"/api/v1/watchlists/{wl_id}/items", json={"symbol": "9999"})
+        response = auth_client.put(f"/api/v1/watchlists/{wl_id}/items/9999")
         assert response.status_code == status.HTTP_404_NOT_FOUND
 
     def test_add_to_other_users_watchlist(self, auth_client, client, sample_stocks):
@@ -191,7 +213,7 @@ class TestAddWatchlistItem:
         token = login_resp.json()["access_token"]
         client.headers.update({"Authorization": f"Bearer {token}"})
 
-        response = client.post(f"/api/v1/watchlists/{wl_id}/items", json={"symbol": "2330"})
+        response = client.put(f"/api/v1/watchlists/{wl_id}/items/2330")
         assert response.status_code == status.HTTP_404_NOT_FOUND
 
 
@@ -201,12 +223,15 @@ class TestRemoveWatchlistItem:
     def test_remove_success(self, auth_client, sample_stocks):
         create_resp = auth_client.post("/api/v1/watchlists", json={"name": "Tech"})
         wl_id = create_resp.json()["id"]
-        auth_client.post(f"/api/v1/watchlists/{wl_id}/items", json={"symbol": "2330"})
+        auth_client.put(f"/api/v1/watchlists/{wl_id}/items/2330")
 
         response = auth_client.delete(f"/api/v1/watchlists/{wl_id}/items/2330")
-        assert response.status_code == status.HTTP_200_OK
-        data = response.json()
-        assert len(data["items"]) == 0
+        assert response.status_code == status.HTTP_204_NO_CONTENT
+        assert response.content == b""
+
+        get_response = auth_client.get(f"/api/v1/watchlists/{wl_id}")
+        assert get_response.status_code == status.HTTP_200_OK
+        assert get_response.json()["items"] == []
 
     def test_remove_stock_not_in_watchlist(self, auth_client, sample_stocks):
         create_resp = auth_client.post("/api/v1/watchlists", json={"name": "Tech"})
@@ -245,7 +270,7 @@ class TestWatchlistQuotes:
 
         create_resp = auth_client.post("/api/v1/watchlists", json={"name": "Tech"})
         wl_id = create_resp.json()["id"]
-        auth_client.post(f"/api/v1/watchlists/{wl_id}/items", json={"symbol": "2330"})
+        auth_client.put(f"/api/v1/watchlists/{wl_id}/items/2330")
 
         response = auth_client.get(f"/api/v1/watchlists/{wl_id}/quotes")
         assert response.status_code == status.HTTP_200_OK
@@ -261,7 +286,7 @@ class TestWatchlistQuotes:
 
         create_resp = auth_client.post("/api/v1/watchlists", json={"name": "Tech"})
         wl_id = create_resp.json()["id"]
-        auth_client.post(f"/api/v1/watchlists/{wl_id}/items", json={"symbol": "2330"})
+        auth_client.put(f"/api/v1/watchlists/{wl_id}/items/2330")
 
         response = auth_client.get(f"/api/v1/watchlists/{wl_id}/quotes")
         assert response.status_code == status.HTTP_200_OK
@@ -304,11 +329,20 @@ class TestWatchlistQuotes:
 
         create_resp = auth_client.post("/api/v1/watchlists", json={"name": "Tech"})
         wl_id = create_resp.json()["id"]
-        auth_client.post(f"/api/v1/watchlists/{wl_id}/items", json={"symbol": "2330"})
-        auth_client.post(f"/api/v1/watchlists/{wl_id}/items", json={"symbol": "2317"})
+        auth_client.put(f"/api/v1/watchlists/{wl_id}/items/2330")
+        auth_client.put(f"/api/v1/watchlists/{wl_id}/items/2317")
 
         response = auth_client.get(f"/api/v1/watchlists/{wl_id}/quotes")
         assert response.status_code == status.HTTP_200_OK
         data = response.json()
         assert len(data["quotes"]) == 1
         assert data["quotes"][0]["symbol"] == "2330"
+
+
+class TestLegacyWatchlistRoutes:
+    def test_post_watchlist_items_route_is_removed(self, auth_client):
+        create_resp = auth_client.post("/api/v1/watchlists", json={"name": "Tech"})
+        wl_id = create_resp.json()["id"]
+
+        response = auth_client.post(f"/api/v1/watchlists/{wl_id}/items", json={"symbol": "2330"})
+        assert response.status_code == status.HTTP_404_NOT_FOUND
