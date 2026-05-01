@@ -6,12 +6,6 @@ from typing import List, Optional
 from pydantic import BaseModel, EmailStr, Field, field_validator
 
 
-# ─── Shared ──────────────────────────────────────────────
-
-class MessageResponse(BaseModel):
-    message: str
-
-
 # ─── User Base ───────────────────────────────────────────
 
 class UserBase(BaseModel):
@@ -167,8 +161,8 @@ class WatchlistCreate(WatchlistBase):
     pass
 
 
-class WatchlistItemCreate(BaseModel):
-    symbol: str = Field(..., min_length=1, max_length=10)
+class WatchlistUpdate(BaseModel):
+    name: Optional[str] = Field(None, min_length=1, max_length=100)
 
 
 class WatchlistItemRead(BaseModel):

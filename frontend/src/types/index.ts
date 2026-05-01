@@ -109,11 +109,3 @@ export interface WatchlistWithQuotes {
   name: string;
   quotes: StockQuote[];
 }
-
-export interface WatchlistItemCreate {
-  symbol: string;
-}
-
-export interface MessageResponse {
-  message: string;
-}
