@@ -34,6 +34,8 @@ app.include_router(watchlists.router)
 
 @app.on_event("startup")
 def startup_event():
+    if settings.environment == "test" or not settings.stock_daily_sync_enabled:
+        return
     start_scheduler()
 
 

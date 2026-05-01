@@ -4,6 +4,10 @@ import sys
 # Ensure project root is on path before any app imports
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 
+# Keep application startup deterministic under pytest.
+os.environ["DEBUG"] = "false"
+os.environ["STOCK_DAILY_SYNC_ENABLED"] = "false"
+
 import pytest
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
