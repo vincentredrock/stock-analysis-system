@@ -126,11 +126,11 @@ The FastAPI backend will automatically serve the built frontend from `frontend/d
 
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| POST | `/api/v1/auth/register` | Register a new user |
-| POST | `/api/v1/auth/login` | Login and get tokens |
-| POST | `/api/v1/auth/logout` | Logout and blacklist token |
-| POST | `/api/v1/auth/refresh` | Refresh access token |
-| GET | `/api/v1/auth/me` | Get current user profile |
+| POST | `/api/v1/users` | Create a new user |
+| GET | `/api/v1/users/me` | Get current user profile |
+| POST | `/api/v1/sessions` | Create a session and get tokens |
+| DELETE | `/api/v1/sessions/current` | Delete the current session |
+| POST | `/api/v1/token-refreshes` | Rotate a refresh token and get a new token pair |
 
 ### Stocks
 

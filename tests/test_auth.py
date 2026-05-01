@@ -8,7 +8,7 @@ from app.security import create_access_token, create_refresh_token, get_password
 # ─── Helpers ──────────────────────────────────────────────
 
 def register_user(client, username="testuser", email="test@example.com", password="Password123!"):
-    return client.post("/api/v1/auth/register", json={
+    return client.post("/api/v1/users", json={
         "username": username,
         "email": email,
         "password": password,
@@ -16,7 +16,7 @@ def register_user(client, username="testuser", email="test@example.com", passwor
 
 
 def login_user(client, username="testuser", password="Password123!"):
-    return client.post("/api/v1/auth/login", json={
+    return client.post("/api/v1/sessions", json={
         "username": username,
         "password": password,
     })
@@ -37,7 +37,13 @@ class TestRegister:
     def test_register_success(self, client):
         response = register_user(client)
         assert response.status_code == status.HTTP_201_CREATED
-        assert response.json()["message"] == "User registered successfully"
+        data = response.json()
+        assert data["username"] == "testuser"
+        assert data["email"] == "test@example.com"
+        assert data["is_active"] is True
+        assert "id" in data
+        assert "created_at" in data
+        assert "updated_at" in data
 
     def test_register_duplicate_username(self, client):
         register_user(client, username="dupeuser", email="a@example.com")
@@ -60,7 +66,7 @@ class TestRegister:
         assert response.status_code == status.HTTP_422_UNPROCESSABLE_ENTITY
 
     def test_register_invalid_email(self, client):
-        response = client.post("/api/v1/auth/register", json={
+        response = client.post("/api/v1/users", json={
             "username": "testuser",
             "email": "not-an-email",
             "password": "Password123!",
@@ -68,7 +74,7 @@ class TestRegister:
         assert response.status_code == status.HTTP_422_UNPROCESSABLE_ENTITY
 
     def test_register_short_username(self, client):
-        response = client.post("/api/v1/auth/register", json={
+        response = client.post("/api/v1/users", json={
             "username": "ab",
             "email": "test@example.com",
             "password": "Password123!",
@@ -76,7 +82,7 @@ class TestRegister:
         assert response.status_code == status.HTTP_422_UNPROCESSABLE_ENTITY
 
     def test_register_missing_fields(self, client):
-        response = client.post("/api/v1/auth/register", json={})
+        response = client.post("/api/v1/users", json={})
         assert response.status_code == status.HTTP_422_UNPROCESSABLE_ENTITY
 
     def test_register_user_is_active_by_default(self, client, db_session):
@@ -121,7 +127,7 @@ class TestLogin:
         assert "User account is inactive" in response.json()["detail"]
 
     def test_login_missing_fields(self, client):
-        response = client.post("/api/v1/auth/login", json={})
+        response = client.post("/api/v1/sessions", json={})
         assert response.status_code == status.HTTP_422_UNPROCESSABLE_ENTITY
 
 
@@ -133,7 +139,7 @@ class TestMe:
         login_resp = login_user(client)
         token = login_resp.json()["access_token"]
 
-        response = client.get("/api/v1/auth/me", headers={"Authorization": f"Bearer {token}"})
+        response = client.get("/api/v1/users/me", headers={"Authorization": f"Bearer {token}"})
         assert response.status_code == status.HTTP_200_OK
         data = response.json()
         assert data["username"] == "testuser"
@@ -144,11 +150,11 @@ class TestMe:
         assert "updated_at" in data
 
     def test_get_me_no_token(self, client):
-        response = client.get("/api/v1/auth/me")
+        response = client.get("/api/v1/users/me")
         assert response.status_code == status.HTTP_401_UNAUTHORIZED
 
     def test_get_me_invalid_token(self, client):
-        response = client.get("/api/v1/auth/me", headers={"Authorization": "Bearer invalidtoken"})
+        response = client.get("/api/v1/users/me", headers={"Authorization": "Bearer invalidtoken"})
         assert response.status_code == status.HTTP_401_UNAUTHORIZED
 
     def test_get_me_blacklisted_token(self, client, db_session):
@@ -164,7 +170,7 @@ class TestMe:
         db_session.add(blacklist)
         db_session.commit()
 
-        response = client.get("/api/v1/auth/me", headers={"Authorization": f"Bearer {token}"})
+        response = client.get("/api/v1/users/me", headers={"Authorization": f"Bearer {token}"})
         assert response.status_code == status.HTTP_401_UNAUTHORIZED
 
     def test_get_me_inactive_user(self, client, db_session):
@@ -176,7 +182,7 @@ class TestMe:
         user.is_active = False
         db_session.commit()
 
-        response = client.get("/api/v1/auth/me", headers={"Authorization": f"Bearer {token}"})
+        response = client.get("/api/v1/users/me", headers={"Authorization": f"Bearer {token}"})
         assert response.status_code == status.HTTP_401_UNAUTHORIZED
 
 
@@ -188,9 +194,9 @@ class TestLogout:
         login_resp = login_user(client)
         token = login_resp.json()["access_token"]
 
-        response = client.post("/api/v1/auth/logout", headers={"Authorization": f"Bearer {token}"})
-        assert response.status_code == status.HTTP_200_OK
-        assert response.json()["message"] == "Logged out successfully"
+        response = client.delete("/api/v1/sessions/current", headers={"Authorization": f"Bearer {token}"})
+        assert response.status_code == status.HTTP_204_NO_CONTENT
+        assert response.content == b""
 
         # Verify token is blacklisted
         from jose import jwt
@@ -204,20 +210,20 @@ class TestLogout:
         login_resp = login_user(client)
         token = login_resp.json()["access_token"]
 
-        resp1 = client.post("/api/v1/auth/logout", headers={"Authorization": f"Bearer {token}"})
-        assert resp1.status_code == status.HTTP_200_OK
+        resp1 = client.delete("/api/v1/sessions/current", headers={"Authorization": f"Bearer {token}"})
+        assert resp1.status_code == status.HTTP_204_NO_CONTENT
 
-        resp2 = client.post("/api/v1/auth/logout", headers={"Authorization": f"Bearer {token}"})
-        assert resp2.status_code == status.HTTP_200_OK
-        assert resp2.json()["message"] == "Logged out successfully"
+        resp2 = client.delete("/api/v1/sessions/current", headers={"Authorization": f"Bearer {token}"})
+        assert resp2.status_code == status.HTTP_204_NO_CONTENT
+        assert resp2.content == b""
 
     def test_logout_invalid_token(self, client):
-        response = client.post("/api/v1/auth/logout", headers={"Authorization": "Bearer invalid"})
+        response = client.delete("/api/v1/sessions/current", headers={"Authorization": "Bearer invalid"})
         assert response.status_code == status.HTTP_401_UNAUTHORIZED
         assert "Invalid token" in response.json()["detail"]
 
     def test_logout_no_token(self, client):
-        response = client.post("/api/v1/auth/logout")
+        response = client.delete("/api/v1/sessions/current")
         assert response.status_code == status.HTTP_401_UNAUTHORIZED
 
     def test_logout_token_without_jti(self, client):
@@ -229,7 +235,7 @@ class TestLogout:
             settings.secret_key,
             algorithm=settings.algorithm,
         )
-        response = client.post("/api/v1/auth/logout", headers={"Authorization": f"Bearer {token}"})
+        response = client.delete("/api/v1/sessions/current", headers={"Authorization": f"Bearer {token}"})
         assert response.status_code == status.HTTP_400_BAD_REQUEST
         assert "Token missing JTI" in response.json()["detail"]
 
@@ -242,7 +248,7 @@ class TestRefresh:
         login_resp = login_user(client)
         refresh_token = login_resp.json()["refresh_token"]
 
-        response = client.post("/api/v1/auth/refresh", json={"refresh_token": refresh_token})
+        response = client.post("/api/v1/token-refreshes", json={"refresh_token": refresh_token})
         assert response.status_code == status.HTTP_200_OK
         data = response.json()
         assert "access_token" in data
@@ -250,7 +256,7 @@ class TestRefresh:
         assert data["token_type"] == "bearer"
 
     def test_refresh_invalid_token(self, client):
-        response = client.post("/api/v1/auth/refresh", json={"refresh_token": "invalid"})
+        response = client.post("/api/v1/token-refreshes", json={"refresh_token": "invalid"})
         assert response.status_code == status.HTTP_401_UNAUTHORIZED
         assert "Invalid refresh token" in response.json()["detail"]
 
@@ -259,7 +265,7 @@ class TestRefresh:
         login_resp = login_user(client)
         access_token = login_resp.json()["access_token"]
 
-        response = client.post("/api/v1/auth/refresh", json={"refresh_token": access_token})
+        response = client.post("/api/v1/token-refreshes", json={"refresh_token": access_token})
         assert response.status_code == status.HTTP_401_UNAUTHORIZED
         assert "Invalid refresh token" in response.json()["detail"]
 
@@ -278,14 +284,14 @@ class TestRefresh:
         db_session.add(blacklist)
         db_session.commit()
 
-        response = client.post("/api/v1/auth/refresh", json={"refresh_token": refresh_token})
+        response = client.post("/api/v1/token-refreshes", json={"refresh_token": refresh_token})
         assert response.status_code == status.HTTP_401_UNAUTHORIZED
         assert "Refresh token has been revoked" in response.json()["detail"]
 
     def test_refresh_user_not_found(self, client):
         # Create a token for a non-existent user
         refresh_token = create_refresh_token(user_id=99999)
-        response = client.post("/api/v1/auth/refresh", json={"refresh_token": refresh_token})
+        response = client.post("/api/v1/token-refreshes", json={"refresh_token": refresh_token})
         assert response.status_code == status.HTTP_401_UNAUTHORIZED
         assert "User not found or inactive" in response.json()["detail"]
 
@@ -298,7 +304,7 @@ class TestRefresh:
         user.is_active = False
         db_session.commit()
 
-        response = client.post("/api/v1/auth/refresh", json={"refresh_token": refresh_token})
+        response = client.post("/api/v1/token-refreshes", json={"refresh_token": refresh_token})
         assert response.status_code == status.HTTP_401_UNAUTHORIZED
         assert "User not found or inactive" in response.json()["detail"]
 
@@ -310,7 +316,7 @@ class TestRefresh:
             settings.secret_key,
             algorithm=settings.algorithm,
         )
-        response = client.post("/api/v1/auth/refresh", json={"refresh_token": token})
+        response = client.post("/api/v1/token-refreshes", json={"refresh_token": token})
         assert response.status_code == status.HTTP_401_UNAUTHORIZED
         assert "Invalid refresh token" in response.json()["detail"]
 
@@ -322,7 +328,7 @@ class TestRefresh:
             settings.secret_key,
             algorithm=settings.algorithm,
         )
-        response = client.post("/api/v1/auth/refresh", json={"refresh_token": token})
+        response = client.post("/api/v1/token-refreshes", json={"refresh_token": token})
         assert response.status_code == status.HTTP_401_UNAUTHORIZED
         assert "Invalid refresh token" in response.json()["detail"]
 
@@ -331,17 +337,17 @@ class TestRefresh:
         login_resp = login_user(client)
         old_refresh_token = login_resp.json()["refresh_token"]
 
-        response = client.post("/api/v1/auth/refresh", json={"refresh_token": old_refresh_token})
+        response = client.post("/api/v1/token-refreshes", json={"refresh_token": old_refresh_token})
         assert response.status_code == status.HTTP_200_OK
         new_refresh_token = response.json()["refresh_token"]
 
         # Old token should now be blacklisted
-        re_response = client.post("/api/v1/auth/refresh", json={"refresh_token": old_refresh_token})
+        re_response = client.post("/api/v1/token-refreshes", json={"refresh_token": old_refresh_token})
         assert re_response.status_code == status.HTTP_401_UNAUTHORIZED
         assert "Refresh token has been revoked" in re_response.json()["detail"]
 
         # New token should work
-        new_response = client.post("/api/v1/auth/refresh", json={"refresh_token": new_refresh_token})
+        new_response = client.post("/api/v1/token-refreshes", json={"refresh_token": new_refresh_token})
         assert new_response.status_code == status.HTTP_200_OK
 
 
@@ -354,10 +360,10 @@ class TestTokenBlacklist:
         access_token = login_resp.json()["access_token"]
 
         # Logout (blacklist)
-        client.post("/api/v1/auth/logout", headers={"Authorization": f"Bearer {access_token}"})
+        client.delete("/api/v1/sessions/current", headers={"Authorization": f"Bearer {access_token}"})
 
         # Try to access protected route
-        response = client.get("/api/v1/auth/me", headers={"Authorization": f"Bearer {access_token}"})
+        response = client.get("/api/v1/users/me", headers={"Authorization": f"Bearer {access_token}"})
         assert response.status_code == status.HTTP_401_UNAUTHORIZED
 
     def test_blacklisted_refresh_token_cannot_refresh(self, client, db_session):
@@ -373,6 +379,22 @@ class TestTokenBlacklist:
         db_session.add(entry)
         db_session.commit()
 
-        response = client.post("/api/v1/auth/refresh", json={"refresh_token": refresh_token})
+        response = client.post("/api/v1/token-refreshes", json={"refresh_token": refresh_token})
         assert response.status_code == status.HTTP_401_UNAUTHORIZED
         assert "Refresh token has been revoked" in response.json()["detail"]
+
+
+class TestLegacyAuthRoutes:
+    @pytest.mark.parametrize(
+        ("method", "path"),
+        [
+            ("post", "/api/v1/auth/register"),
+            ("post", "/api/v1/auth/login"),
+            ("post", "/api/v1/auth/logout"),
+            ("post", "/api/v1/auth/refresh"),
+            ("get", "/api/v1/auth/me"),
+        ],
+    )
+    def test_action_oriented_auth_routes_are_removed(self, client, method, path):
+        response = getattr(client, method)(path)
+        assert response.status_code == status.HTTP_404_NOT_FOUND
