@@ -109,7 +109,3 @@ export interface WatchlistWithQuotes {
   name: string;
   quotes: StockQuote[];
 }
-
-export interface MessageResponse {
-  message: string;
-}
