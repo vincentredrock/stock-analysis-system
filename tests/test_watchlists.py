@@ -182,7 +182,8 @@ class TestAddWatchlistItem:
         wl_id = create_resp.json()["id"]
 
         response = auth_client.put(f"/api/v1/watchlists/{wl_id}/items/2330")
-        assert response.status_code == status.HTTP_200_OK
+        assert response.status_code == status.HTTP_201_CREATED
+        assert response.headers["location"] == f"/api/v1/watchlists/{wl_id}/items/2330"
         data = response.json()
         assert len(data["items"]) == 1
         assert data["items"][0]["symbol"] == "2330"

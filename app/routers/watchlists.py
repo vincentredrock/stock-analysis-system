@@ -140,6 +140,7 @@ def delete_watchlist(
 def put_watchlist_item(
     watchlist_id: int,
     symbol: str,
+    response: Response,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_user),
 ):
@@ -163,6 +164,8 @@ def put_watchlist_item(
         db.add(item)
         db.commit()
         db.refresh(watchlist)
+        response.status_code = status.HTTP_201_CREATED
+        response.headers["Location"] = f"/api/v1/watchlists/{watchlist_id}/items/{symbol}"
 
     items = [i.stock for i in watchlist.items]
     return WatchlistRead(

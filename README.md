@@ -122,6 +122,21 @@ The FastAPI backend will automatically serve the built frontend from `frontend/d
 
 ## API Endpoints
 
+All application API routes are mounted under `/api/v1`. Route paths are resource-oriented; filtering uses query parameters and state changes use HTTP methods instead of action names. Error responses use FastAPI's default JSON shape, for example `{"detail": "..."}`.
+
+Common status codes:
+
+| Status | Meaning |
+|--------|---------|
+| 200 | Resource returned or updated |
+| 201 | Resource created |
+| 204 | Resource deleted with no response body |
+| 400 | Invalid state transition or date range |
+| 401 | Missing or invalid authentication |
+| 404 | Resource not found |
+| 422 | Request validation failed |
+| 503 | Upstream stock data source unavailable |
+
 ### Authentication
 
 | Method | Endpoint | Description |
