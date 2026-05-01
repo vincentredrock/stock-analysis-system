@@ -39,13 +39,6 @@ export interface Stock {
   updated_at: string;
 }
 
-export interface StockSearchResult {
-  symbol: string;
-  name: string;
-  market: string;
-  industry?: string | null;
-}
-
 export interface StockPrice {
   date: string;
   open_price: string;

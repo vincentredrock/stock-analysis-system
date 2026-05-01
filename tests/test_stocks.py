@@ -13,7 +13,7 @@ from tests.conftest import login_user, register_user
 
 class TestStocksAuth:
     def test_search_requires_auth(self, client):
-        response = client.get("/api/v1/stocks/search?q=台積")
+        response = client.get("/api/v1/stocks?q=台積")
         assert response.status_code == status.HTTP_401_UNAUTHORIZED
 
     def test_list_requires_auth(self, client):
@@ -21,11 +21,11 @@ class TestStocksAuth:
         assert response.status_code == status.HTTP_401_UNAUTHORIZED
 
     def test_quote_requires_auth(self, client):
-        response = client.get("/api/v1/stocks/2330/quote")
+        response = client.get("/api/v1/stocks/2330/quotes/latest")
         assert response.status_code == status.HTTP_401_UNAUTHORIZED
 
     def test_history_requires_auth(self, client):
-        response = client.get("/api/v1/stocks/2330/history")
+        response = client.get("/api/v1/stocks/2330/prices")
         assert response.status_code == status.HTTP_401_UNAUTHORIZED
 
     def test_sync_requires_auth(self, client):
@@ -37,7 +37,7 @@ class TestStocksAuth:
 
 class TestStockSearch:
     def test_search_by_symbol(self, auth_client, sample_stocks):
-        response = auth_client.get("/api/v1/stocks/search?q=2330")
+        response = auth_client.get("/api/v1/stocks?q=2330")
         assert response.status_code == status.HTTP_200_OK
         data = response.json()
         assert len(data) == 1
@@ -45,23 +45,23 @@ class TestStockSearch:
         assert data[0]["name"] == "台積電"
 
     def test_search_by_name(self, auth_client, sample_stocks):
-        response = auth_client.get("/api/v1/stocks/search?q=台積")
+        response = auth_client.get("/api/v1/stocks?q=台積")
         assert response.status_code == status.HTTP_200_OK
         data = response.json()
         assert len(data) == 1
         assert data[0]["symbol"] == "2330"
 
     def test_search_no_results(self, auth_client, sample_stocks):
-        response = auth_client.get("/api/v1/stocks/search?q=XYZ")
+        response = auth_client.get("/api/v1/stocks?q=XYZ")
         assert response.status_code == status.HTTP_200_OK
         assert response.json() == []
 
     def test_search_empty_query(self, auth_client):
-        response = auth_client.get("/api/v1/stocks/search?q=")
+        response = auth_client.get("/api/v1/stocks?q=")
         assert response.status_code == status.HTTP_422_UNPROCESSABLE_ENTITY
 
     def test_search_case_insensitive(self, auth_client, sample_stocks):
-        response = auth_client.get("/api/v1/stocks/search?q=tsmc")
+        response = auth_client.get("/api/v1/stocks?q=tsmc")
         assert response.status_code == status.HTTP_200_OK
         # Should not find anything since our sample uses Chinese names
         assert response.json() == []
@@ -70,7 +70,7 @@ class TestStockSearch:
         stock = db_session.query(Stock).filter(Stock.symbol == "2330").first()
         stock.is_active = False
         db_session.commit()
-        response = auth_client.get("/api/v1/stocks/search?q=2330")
+        response = auth_client.get("/api/v1/stocks?q=2330")
         assert response.status_code == status.HTTP_200_OK
         assert response.json() == []
 
@@ -91,10 +91,31 @@ class TestListStocks:
         assert response.status_code == status.HTTP_200_OK
         assert len(response.json()) == 2
 
-    def test_list_stocks_skip(self, auth_client, sample_stocks):
-        response = auth_client.get("/api/v1/stocks?skip=1&limit=1")
+    def test_list_stocks_offset(self, auth_client, sample_stocks):
+        response = auth_client.get("/api/v1/stocks?offset=1&limit=1")
         assert response.status_code == status.HTTP_200_OK
         assert len(response.json()) == 1
+
+
+class TestGetStock:
+    def test_get_stock(self, auth_client, sample_stocks):
+        response = auth_client.get("/api/v1/stocks/2330")
+        assert response.status_code == status.HTTP_200_OK
+        data = response.json()
+        assert data["symbol"] == "2330"
+        assert data["name"] == "台積電"
+
+    def test_get_inactive_stock_not_found(self, auth_client, sample_stocks, db_session):
+        stock = db_session.query(Stock).filter(Stock.symbol == "2330").first()
+        stock.is_active = False
+        db_session.commit()
+
+        response = auth_client.get("/api/v1/stocks/2330")
+        assert response.status_code == status.HTTP_404_NOT_FOUND
+
+    def test_get_stock_not_found(self, auth_client):
+        response = auth_client.get("/api/v1/stocks/9999")
+        assert response.status_code == status.HTTP_404_NOT_FOUND
 
 
 # ─── Quote ────────────────────────────────────────────────
@@ -115,7 +136,7 @@ class TestStockQuote:
                 "price_change_percent": "1.19",
             },
         }
-        response = auth_client.get("/api/v1/stocks/2330/quote")
+        response = auth_client.get("/api/v1/stocks/2330/quotes/latest")
         assert response.status_code == status.HTTP_200_OK
         data = response.json()
         assert data["symbol"] == "2330"
@@ -130,11 +151,11 @@ class TestStockQuote:
     @patch("app.services.stock_data.twstock.realtime.get")
     def test_get_quote_source_failure(self, mock_get, auth_client, sample_stocks):
         mock_get.return_value = {"success": False}
-        response = auth_client.get("/api/v1/stocks/2330/quote")
+        response = auth_client.get("/api/v1/stocks/2330/quotes/latest")
         assert response.status_code == status.HTTP_503_SERVICE_UNAVAILABLE
 
     def test_get_quote_stock_not_found(self, auth_client):
-        response = auth_client.get("/api/v1/stocks/9999/quote")
+        response = auth_client.get("/api/v1/stocks/9999/quotes/latest")
         assert response.status_code == status.HTTP_404_NOT_FOUND
 
 
@@ -167,7 +188,7 @@ class TestStockHistory:
             db_session.add(p)
         db_session.commit()
 
-        response = auth_client.get("/api/v1/stocks/2330/history")
+        response = auth_client.get("/api/v1/stocks/2330/prices")
         assert response.status_code == status.HTTP_200_OK
         data = response.json()
         assert len(data) == 2
@@ -200,25 +221,24 @@ class TestStockHistory:
             db_session.add(p)
         db_session.commit()
 
-        response = auth_client.get("/api/v1/stocks/2330/history?start=2024-01-01&end=2024-01-10")
+        response = auth_client.get("/api/v1/stocks/2330/prices?start=2024-01-01&end=2024-01-10")
         assert response.status_code == status.HTTP_200_OK
         data = response.json()
         assert len(data) == 1
         assert data[0]["date"] == "2024-01-01"
 
     def test_get_history_empty(self, auth_client, sample_stocks):
-        response = auth_client.get("/api/v1/stocks/2330/history")
+        response = auth_client.get("/api/v1/stocks/2330/prices")
         assert response.status_code == status.HTTP_200_OK
         assert response.json() == []
 
     def test_get_history_stock_not_found(self, auth_client):
-        response = auth_client.get("/api/v1/stocks/9999/history")
+        response = auth_client.get("/api/v1/stocks/9999/prices")
         assert response.status_code == status.HTTP_404_NOT_FOUND
 
     def test_get_history_invalid_date_format(self, auth_client, sample_stocks):
-        response = auth_client.get("/api/v1/stocks/2330/history?start=01-01-2024")
-        # SQLite may accept it, but at minimum we ensure it doesn't crash
-        assert response.status_code in (status.HTTP_200_OK, status.HTTP_422_UNPROCESSABLE_ENTITY)
+        response = auth_client.get("/api/v1/stocks/2330/prices?start=01-01-2024")
+        assert response.status_code == status.HTTP_422_UNPROCESSABLE_ENTITY
 
     def test_get_history_start_only(self, auth_client, sample_stocks, db_session):
         stock = db_session.query(Stock).filter(Stock.symbol == "2330").first()
@@ -246,7 +266,7 @@ class TestStockHistory:
             db_session.add(p)
         db_session.commit()
 
-        response = auth_client.get("/api/v1/stocks/2330/history?start=2024-01-10")
+        response = auth_client.get("/api/v1/stocks/2330/prices?start=2024-01-10")
         assert response.status_code == status.HTTP_200_OK
         data = response.json()
         assert len(data) == 1
@@ -278,7 +298,7 @@ class TestStockHistory:
             db_session.add(p)
         db_session.commit()
 
-        response = auth_client.get("/api/v1/stocks/2330/history?end=2024-01-10")
+        response = auth_client.get("/api/v1/stocks/2330/prices?end=2024-01-10")
         assert response.status_code == status.HTTP_200_OK
         data = response.json()
         assert len(data) == 1
@@ -413,4 +433,18 @@ class TestStockSyncStatus:
 
     def test_get_sync_status_stock_not_found(self, auth_client):
         response = auth_client.get("/api/v1/stocks/9999/sync-status")
+        assert response.status_code == status.HTTP_404_NOT_FOUND
+
+
+class TestLegacyStockRoutes:
+    @pytest.mark.parametrize(
+        "path",
+        [
+            "/api/v1/stocks/search?q=2330",
+            "/api/v1/stocks/2330/quote",
+            "/api/v1/stocks/2330/history",
+        ],
+    )
+    def test_action_oriented_stock_routes_are_removed(self, auth_client, path):
+        response = auth_client.get(path)
         assert response.status_code == status.HTTP_404_NOT_FOUND

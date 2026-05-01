@@ -1,27 +1,26 @@
 import { apiClient } from "./client";
 import type {
   Stock,
-  StockSearchResult,
   StockPrice,
   StockQuote,
   StockSyncResult,
   StockSyncStatus,
 } from "@/types";
 
-export async function searchStocks(q: string): Promise<StockSearchResult[]> {
-  const res = await apiClient.get<StockSearchResult[]>("/stocks/search", {
+export async function searchStocks(q: string): Promise<Stock[]> {
+  const res = await apiClient.get<Stock[]>("/stocks", {
     params: { q },
   });
   return res.data;
 }
 
-export async function listStocks(skip = 0, limit = 100): Promise<Stock[]> {
-  const res = await apiClient.get<Stock[]>("/stocks", { params: { skip, limit } });
+export async function listStocks(offset = 0, limit = 100): Promise<Stock[]> {
+  const res = await apiClient.get<Stock[]>("/stocks", { params: { offset, limit } });
   return res.data;
 }
 
 export async function getStockQuote(symbol: string): Promise<StockQuote> {
-  const res = await apiClient.get<StockQuote>(`/stocks/${symbol}/quote`);
+  const res = await apiClient.get<StockQuote>(`/stocks/${symbol}/quotes/latest`);
   return res.data;
 }
 
@@ -30,7 +29,7 @@ export async function getStockHistory(
   start?: string,
   end?: string
 ): Promise<StockPrice[]> {
-  const res = await apiClient.get<StockPrice[]>(`/stocks/${symbol}/history`, {
+  const res = await apiClient.get<StockPrice[]>(`/stocks/${symbol}/prices`, {
     params: { start, end },
   });
   return res.data;

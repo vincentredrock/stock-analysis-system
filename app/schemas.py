@@ -93,15 +93,6 @@ class StockRead(StockBase):
     model_config = {"from_attributes": True}
 
 
-class StockSearchResult(BaseModel):
-    symbol: str
-    name: str
-    market: str
-    industry: Optional[str]
-
-    model_config = {"from_attributes": True}
-
-
 # ─── Stock Price ─────────────────────────────────────────
 
 class StockPriceRead(BaseModel):

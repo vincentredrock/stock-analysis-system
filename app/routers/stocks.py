@@ -11,7 +11,6 @@ from app.schemas import (
     StockPriceRead,
     StockQuoteRead,
     StockRead,
-    StockSearchResult,
     StockSyncResultRead,
     StockSyncStatusRead,
 )
@@ -20,38 +19,39 @@ from app.services.stock_data import async_get_realtime_quote, sync_historical_pr
 router = APIRouter(prefix="/stocks", tags=["Stocks"])
 
 
-@router.get("/search", response_model=List[StockSearchResult])
-def search_stocks(
-    q: str = Query(..., min_length=1, description="Search query for stock name or symbol"),
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_active_user),
-):
-    """Search stocks by symbol or name."""
-    stocks = (
-        db.query(Stock)
-        .filter(
-            (Stock.symbol.ilike(f"%{q}%")) | (Stock.name.ilike(f"%{q}%"))
-        )
-        .filter(Stock.is_active == True)
-        .limit(20)
-        .all()
-    )
-    return stocks
-
-
 @router.get("", response_model=List[StockRead])
 def list_stocks(
-    skip: int = 0,
-    limit: int = 100,
+    q: Optional[str] = Query(None, min_length=1, description="Optional search query for stock name or symbol"),
+    offset: int = Query(0, ge=0),
+    limit: int = Query(100, ge=1, le=500),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_user),
 ):
-    """List all available stocks."""
-    stocks = db.query(Stock).filter(Stock.is_active == True).offset(skip).limit(limit).all()
+    """List available stocks, optionally filtered by symbol or name."""
+    query = db.query(Stock).filter(Stock.is_active == True)
+    if q:
+        query = query.filter((Stock.symbol.ilike(f"%{q}%")) | (Stock.name.ilike(f"%{q}%")))
+    stocks = query.offset(offset).limit(limit).all()
     return stocks
 
 
-@router.get("/{symbol}/quote", response_model=StockQuoteRead)
+@router.get("/{symbol}", response_model=StockRead)
+def get_stock(
+    symbol: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+):
+    """Get a stock resource."""
+    stock = db.query(Stock).filter(Stock.symbol == symbol, Stock.is_active == True).first()
+    if not stock:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Stock {symbol} not found",
+        )
+    return stock
+
+
+@router.get("/{symbol}/quotes/latest", response_model=StockQuoteRead)
 async def get_stock_quote(
     symbol: str,
     db: Session = Depends(get_db),
@@ -75,11 +75,11 @@ async def get_stock_quote(
     return StockQuoteRead(**quote)
 
 
-@router.get("/{symbol}/history", response_model=List[StockPriceRead])
+@router.get("/{symbol}/prices", response_model=List[StockPriceRead])
 def get_stock_history(
     symbol: str,
-    start: Optional[str] = Query(None, description="Start date (YYYY-MM-DD)"),
-    end: Optional[str] = Query(None, description="End date (YYYY-MM-DD)"),
+    start: Optional[date] = Query(None, description="Start date (YYYY-MM-DD)"),
+    end: Optional[date] = Query(None, description="End date (YYYY-MM-DD)"),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_user),
 ):

@@ -136,10 +136,10 @@ The FastAPI backend will automatically serve the built frontend from `frontend/d
 
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| GET | `/api/v1/stocks/search?q={query}` | Search stocks by symbol/name |
-| GET | `/api/v1/stocks` | List all stocks (paginated) |
-| GET | `/api/v1/stocks/{symbol}/quote` | Get real-time quote |
-| GET | `/api/v1/stocks/{symbol}/history` | Get historical prices |
+| GET | `/api/v1/stocks?q={query}` | List or search stocks by symbol/name |
+| GET | `/api/v1/stocks/{symbol}` | Get stock details |
+| GET | `/api/v1/stocks/{symbol}/quotes/latest` | Get latest quote |
+| GET | `/api/v1/stocks/{symbol}/prices` | Get historical prices |
 | POST | `/api/v1/stocks/{symbol}/sync` | Trigger historical price sync |
 
 ### Watchlists
