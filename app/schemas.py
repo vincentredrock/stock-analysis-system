@@ -167,6 +167,10 @@ class WatchlistCreate(WatchlistBase):
     pass
 
 
+class WatchlistUpdate(BaseModel):
+    name: Optional[str] = Field(None, min_length=1, max_length=100)
+
+
 class WatchlistItemCreate(BaseModel):
     symbol: str = Field(..., min_length=1, max_length=10)
 

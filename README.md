@@ -151,8 +151,9 @@ The FastAPI backend will automatically serve the built frontend from `frontend/d
 | GET | `/api/v1/watchlists` | List user's watchlists |
 | POST | `/api/v1/watchlists` | Create a watchlist |
 | GET | `/api/v1/watchlists/{id}` | Get watchlist details |
+| PATCH | `/api/v1/watchlists/{id}` | Update a watchlist |
 | DELETE | `/api/v1/watchlists/{id}` | Delete a watchlist |
-| POST | `/api/v1/watchlists/{id}/items` | Add stock to watchlist |
+| PUT | `/api/v1/watchlists/{id}/items/{symbol}` | Ensure stock is in watchlist |
 | DELETE | `/api/v1/watchlists/{id}/items/{symbol}` | Remove stock from watchlist |
 | GET | `/api/v1/watchlists/{id}/quotes` | Get quotes for watchlist stocks |
 

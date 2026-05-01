@@ -147,7 +147,7 @@ export function StockDetailPage() {
 
   const addItemMutation = useMutation({
     mutationFn: ({ watchlistId, symbol: s }: { watchlistId: number; symbol: string }) =>
-      addWatchlistItem(watchlistId, { symbol: s }),
+      addWatchlistItem(watchlistId, s),
     onSuccess: () => {
       toast.success("Added to watchlist");
       setShowAddMenu(false);
