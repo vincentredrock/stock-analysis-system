@@ -1,16 +1,15 @@
 from datetime import datetime, timezone, timedelta
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Response, status
 from fastapi.security import OAuth2PasswordBearer
 from sqlalchemy.orm import Session
 
 from app.config import settings
 from app.database import get_db
-from app.dependencies import get_current_user, get_current_active_user
+from app.dependencies import get_current_active_user
 from app.models import User, TokenBlacklist
 from app.schemas import (
     LoginRequest,
-    MessageResponse,
     RefreshRequest,
     TokenPair,
     UserCreate,
@@ -24,10 +23,10 @@ from app.security import (
     verify_password,
 )
 
-router = APIRouter(prefix="/auth", tags=["Authentication"])
+router = APIRouter(tags=["Authentication"])
 
 
-@router.post("/register", response_model=MessageResponse, status_code=status.HTTP_201_CREATED)
+@router.post("/users", response_model=UserRead, status_code=status.HTTP_201_CREATED)
 def register(user_in: UserCreate, db: Session = Depends(get_db)):
     # Check existing username
     existing_user = db.query(User).filter(User.username == user_in.username).first()
@@ -54,10 +53,10 @@ def register(user_in: UserCreate, db: Session = Depends(get_db)):
     db.commit()
     db.refresh(user)
 
-    return MessageResponse(message="User registered successfully")
+    return user
 
 
-@router.post("/login", response_model=TokenPair)
+@router.post("/sessions", response_model=TokenPair)
 def login(credentials: LoginRequest, db: Session = Depends(get_db)):
     user = db.query(User).filter(User.username == credentials.username).first()
     if not user or not verify_password(credentials.password, user.hashed_password):
@@ -79,9 +78,9 @@ def login(credentials: LoginRequest, db: Session = Depends(get_db)):
     return TokenPair(access_token=access_token, refresh_token=refresh_token)
 
 
-@router.post("/logout", response_model=MessageResponse)
+@router.delete("/sessions/current", status_code=status.HTTP_204_NO_CONTENT)
 def logout(
-    token: str = Depends(OAuth2PasswordBearer(tokenUrl="/api/v1/auth/login")),
+    token: str = Depends(OAuth2PasswordBearer(tokenUrl="/api/v1/sessions")),
     db: Session = Depends(get_db),
 ):
     payload = decode_token(token)
@@ -103,7 +102,7 @@ def logout(
     # Check if already blacklisted (idempotent)
     existing = db.query(TokenBlacklist).filter(TokenBlacklist.token_jti == jti).first()
     if existing:
-        return MessageResponse(message="Logged out successfully")
+        return Response(status_code=status.HTTP_204_NO_CONTENT)
 
     expires_at = datetime.now(timezone.utc) + timedelta(days=1)
     if exp_timestamp:
@@ -116,10 +115,10 @@ def logout(
     db.add(blacklist_entry)
     db.commit()
 
-    return MessageResponse(message="Logged out successfully")
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
-@router.post("/refresh", response_model=TokenPair)
+@router.post("/token-refreshes", response_model=TokenPair)
 def refresh(request: RefreshRequest, db: Session = Depends(get_db)):
     payload = decode_token(request.refresh_token)
     if payload is None:
@@ -173,6 +172,6 @@ def refresh(request: RefreshRequest, db: Session = Depends(get_db)):
     return TokenPair(access_token=new_access_token, refresh_token=new_refresh_token)
 
 
-@router.get("/me", response_model=UserRead)
+@router.get("/users/me", response_model=UserRead)
 def get_me(current_user: User = Depends(get_current_active_user)):
     return current_user

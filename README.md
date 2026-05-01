@@ -122,25 +122,42 @@ The FastAPI backend will automatically serve the built frontend from `frontend/d
 
 ## API Endpoints
 
+All application API routes are mounted under `/api/v1`. Route paths are resource-oriented; filtering uses query parameters and state changes use HTTP methods instead of action names. Error responses use FastAPI's default JSON shape, for example `{"detail": "..."}`.
+
+Common status codes:
+
+| Status | Meaning |
+|--------|---------|
+| 200 | Resource returned or updated |
+| 201 | Resource created |
+| 204 | Resource deleted with no response body |
+| 400 | Invalid state transition or date range |
+| 401 | Missing or invalid authentication |
+| 404 | Resource not found |
+| 422 | Request validation failed |
+| 503 | Upstream stock data source unavailable |
+
 ### Authentication
 
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| POST | `/api/v1/auth/register` | Register a new user |
-| POST | `/api/v1/auth/login` | Login and get tokens |
-| POST | `/api/v1/auth/logout` | Logout and blacklist token |
-| POST | `/api/v1/auth/refresh` | Refresh access token |
-| GET | `/api/v1/auth/me` | Get current user profile |
+| POST | `/api/v1/users` | Create a new user |
+| GET | `/api/v1/users/me` | Get current user profile |
+| POST | `/api/v1/sessions` | Create a session and get tokens |
+| DELETE | `/api/v1/sessions/current` | Delete the current session |
+| POST | `/api/v1/token-refreshes` | Rotate a refresh token and get a new token pair |
 
 ### Stocks
 
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| GET | `/api/v1/stocks/search?q={query}` | Search stocks by symbol/name |
-| GET | `/api/v1/stocks` | List all stocks (paginated) |
-| GET | `/api/v1/stocks/{symbol}/quote` | Get real-time quote |
-| GET | `/api/v1/stocks/{symbol}/history` | Get historical prices |
-| POST | `/api/v1/stocks/{symbol}/sync` | Trigger historical price sync |
+| GET | `/api/v1/stocks?q={query}` | List or search stocks by symbol/name |
+| GET | `/api/v1/stocks/{symbol}` | Get stock details |
+| GET | `/api/v1/stocks/{symbol}/quotes/latest` | Get latest quote |
+| GET | `/api/v1/stocks/{symbol}/prices` | Get historical prices |
+| GET | `/api/v1/stocks/{symbol}/sync-status` | Get historical price sync status |
+| POST | `/api/v1/stock-sync-jobs` | Create a historical price sync job |
+| GET | `/api/v1/stock-sync-jobs/{id}` | Get a historical price sync job |
 
 ### Watchlists
 
@@ -149,8 +166,9 @@ The FastAPI backend will automatically serve the built frontend from `frontend/d
 | GET | `/api/v1/watchlists` | List user's watchlists |
 | POST | `/api/v1/watchlists` | Create a watchlist |
 | GET | `/api/v1/watchlists/{id}` | Get watchlist details |
+| PATCH | `/api/v1/watchlists/{id}` | Update a watchlist |
 | DELETE | `/api/v1/watchlists/{id}` | Delete a watchlist |
-| POST | `/api/v1/watchlists/{id}/items` | Add stock to watchlist |
+| PUT | `/api/v1/watchlists/{id}/items/{symbol}` | Ensure stock is in watchlist |
 | DELETE | `/api/v1/watchlists/{id}/items/{symbol}` | Remove stock from watchlist |
 | GET | `/api/v1/watchlists/{id}/quotes` | Get quotes for watchlist stocks |
 

@@ -16,6 +16,14 @@ class TestHealth:
             assert response.json() == {"status": "healthy"}
 
 
+class TestStartup:
+    def test_scheduler_does_not_start_in_test_environment(self):
+        with patch("app.main.start_scheduler") as mock_start_scheduler:
+            with TestClient(app):
+                pass
+            mock_start_scheduler.assert_not_called()
+
+
 class TestFrontendFallback:
     def test_serves_existing_file(self):
         with patch("os.path.exists", return_value=True), patch("os.path.isfile", return_value=True), patch("app.main.FileResponse") as mock_file:

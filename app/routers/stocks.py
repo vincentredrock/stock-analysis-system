@@ -1,57 +1,77 @@
-from datetime import date
+from datetime import date, datetime, timezone
 from typing import List, Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 from sqlalchemy.orm import Session
 
 from app.database import get_db
 from app.dependencies import get_current_active_user
-from app.models import Stock, StockPrice, StockSyncStatus, User
+from app.models import Stock, StockPrice, StockSyncJob, StockSyncStatus, User
 from app.schemas import (
     StockPriceRead,
     StockQuoteRead,
     StockRead,
-    StockSearchResult,
-    StockSyncResultRead,
+    StockSyncJobCreate,
+    StockSyncJobRead,
     StockSyncStatusRead,
 )
 from app.services.stock_data import async_get_realtime_quote, sync_historical_prices
 
 router = APIRouter(prefix="/stocks", tags=["Stocks"])
+sync_jobs_router = APIRouter(prefix="/stock-sync-jobs", tags=["Stock Sync Jobs"])
 
 
-@router.get("/search", response_model=List[StockSearchResult])
-def search_stocks(
-    q: str = Query(..., min_length=1, description="Search query for stock name or symbol"),
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_active_user),
-):
-    """Search stocks by symbol or name."""
-    stocks = (
-        db.query(Stock)
-        .filter(
-            (Stock.symbol.ilike(f"%{q}%")) | (Stock.name.ilike(f"%{q}%"))
-        )
-        .filter(Stock.is_active == True)
-        .limit(20)
-        .all()
+def _read_stock_sync_job(job: StockSyncJob) -> StockSyncJobRead:
+    return StockSyncJobRead(
+        id=job.id,
+        symbol=job.stock.symbol,
+        status=job.status,
+        start=job.requested_from,
+        end=job.requested_to,
+        message=job.message,
+        error=job.last_error,
+        records_upserted=job.records_upserted,
+        records_skipped=job.records_skipped,
+        months_requested=job.months_requested,
+        created_at=job.created_at,
+        started_at=job.started_at,
+        completed_at=job.completed_at,
     )
-    return stocks
 
 
 @router.get("", response_model=List[StockRead])
 def list_stocks(
-    skip: int = 0,
-    limit: int = 100,
+    q: Optional[str] = Query(None, min_length=1, description="Optional search query for stock name or symbol"),
+    offset: int = Query(0, ge=0),
+    limit: int = Query(100, ge=1, le=500),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_user),
 ):
-    """List all available stocks."""
-    stocks = db.query(Stock).filter(Stock.is_active == True).offset(skip).limit(limit).all()
+    """List available stocks, optionally filtered by symbol or name."""
+    query = db.query(Stock).filter(Stock.is_active == True)
+    if q:
+        query = query.filter((Stock.symbol.ilike(f"%{q}%")) | (Stock.name.ilike(f"%{q}%")))
+    stocks = query.offset(offset).limit(limit).all()
     return stocks
 
 
-@router.get("/{symbol}/quote", response_model=StockQuoteRead)
+@router.get("/{symbol}", response_model=StockRead)
+def get_stock(
+    symbol: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+):
+    """Get a stock resource."""
+    stock = db.query(Stock).filter(Stock.symbol == symbol, Stock.is_active == True).first()
+    if not stock:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Stock {symbol} not found",
+        )
+    return stock
+
+
+@router.get("/{symbol}/quotes/latest", response_model=StockQuoteRead)
 async def get_stock_quote(
     symbol: str,
     db: Session = Depends(get_db),
@@ -75,11 +95,11 @@ async def get_stock_quote(
     return StockQuoteRead(**quote)
 
 
-@router.get("/{symbol}/history", response_model=List[StockPriceRead])
+@router.get("/{symbol}/prices", response_model=List[StockPriceRead])
 def get_stock_history(
     symbol: str,
-    start: Optional[str] = Query(None, description="Start date (YYYY-MM-DD)"),
-    end: Optional[str] = Query(None, description="End date (YYYY-MM-DD)"),
+    start: Optional[date] = Query(None, description="Start date (YYYY-MM-DD)"),
+    end: Optional[date] = Query(None, description="End date (YYYY-MM-DD)"),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_user),
 ):
@@ -132,41 +152,73 @@ def get_stock_sync_status(
     )
 
 
-@router.post("/{symbol}/sync", response_model=StockSyncResultRead)
-def sync_stock_prices(
-    symbol: str,
-    start: Optional[date] = Query(None, description="Start date (YYYY-MM-DD). Defaults to full backfill or recent refresh."),
-    end: Optional[date] = Query(None, description="End date (YYYY-MM-DD). Defaults to today in Asia/Taipei."),
+@sync_jobs_router.post("", response_model=StockSyncJobRead, status_code=status.HTTP_201_CREATED)
+def create_stock_sync_job(
+    job_in: StockSyncJobCreate,
+    response: Response,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_user),
 ):
-    """Trigger historical price sync for a stock from twstock."""
-    stock = db.query(Stock).filter(Stock.symbol == symbol).first()
+    """Create a stock historical price sync job."""
+    if job_in.start and job_in.end and job_in.start > job_in.end:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Start date cannot be after end date",
+        )
+
+    stock = db.query(Stock).filter(Stock.symbol == job_in.symbol).first()
     if not stock:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Stock {symbol} not found",
+            detail=f"Stock {job_in.symbol} not found",
         )
+
+    now = datetime.now(timezone.utc)
+    job = StockSyncJob(
+        stock_id=stock.id,
+        status="running",
+        requested_from=job_in.start,
+        requested_to=job_in.end,
+        started_at=now,
+    )
+    db.add(job)
+    db.flush()
 
     try:
-        result = sync_historical_prices(db, symbol, start=start, end=end)
-    except ValueError as e:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=str(e),
-        )
+        result = sync_historical_prices(db, job_in.symbol, start=job_in.start, end=job_in.end)
     except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail=f"Failed to sync prices: {str(e)}",
-        )
+        job.status = "failed"
+        job.last_error = f"Failed to sync prices: {str(e)}"
+        job.completed_at = datetime.now(timezone.utc)
+        db.commit()
+        db.refresh(job)
+    else:
+        job.status = "success"
+        job.requested_from = result.start
+        job.requested_to = result.end
+        job.message = result.message
+        job.records_upserted = result.records_upserted
+        job.records_skipped = result.records_skipped
+        job.months_requested = result.months_requested
+        job.completed_at = datetime.now(timezone.utc)
+        db.commit()
+        db.refresh(job)
 
-    return StockSyncResultRead(
-        message=result.message,
-        symbol=result.symbol,
-        start=result.start,
-        end=result.end,
-        records_upserted=result.records_upserted,
-        records_skipped=result.records_skipped,
-        months_requested=result.months_requested,
-    )
+    response.headers["Location"] = f"/api/v1/stock-sync-jobs/{job.id}"
+    return _read_stock_sync_job(job)
+
+
+@sync_jobs_router.get("/{job_id}", response_model=StockSyncJobRead)
+def get_stock_sync_job(
+    job_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+):
+    """Get a stock sync job resource."""
+    job = db.query(StockSyncJob).filter(StockSyncJob.id == job_id).first()
+    if not job:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Stock sync job not found",
+        )
+    return _read_stock_sync_job(job)

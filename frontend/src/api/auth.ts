@@ -4,27 +4,25 @@ import type {
   RegisterRequest,
   TokenPair,
   User,
-  MessageResponse,
 } from "@/types";
 
 export async function login(data: LoginRequest): Promise<TokenPair> {
-  const res = await apiClient.post<TokenPair>("/auth/login", data);
+  const res = await apiClient.post<TokenPair>("/sessions", data);
   return res.data;
 }
 
-export async function register(data: RegisterRequest): Promise<MessageResponse> {
-  const res = await apiClient.post<MessageResponse>("/auth/register", data);
+export async function register(data: RegisterRequest): Promise<User> {
+  const res = await apiClient.post<User>("/users", data);
   return res.data;
 }
 
-export async function logout(token: string): Promise<MessageResponse> {
-  const res = await apiClient.post<MessageResponse>("/auth/logout", null, {
+export async function logout(token: string): Promise<void> {
+  await apiClient.delete("/sessions/current", {
     headers: { Authorization: `Bearer ${token}` },
   });
-  return res.data;
 }
 
 export async function getMe(): Promise<User> {
-  const res = await apiClient.get<User>("/auth/me");
+  const res = await apiClient.get<User>("/users/me");
   return res.data;
 }

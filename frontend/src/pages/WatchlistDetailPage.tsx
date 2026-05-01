@@ -60,7 +60,7 @@ export function WatchlistDetailPage() {
   });
 
   const addMutation = useMutation({
-    mutationFn: (symbol: string) => addWatchlistItem(watchlistId, { symbol }),
+    mutationFn: (symbol: string) => addWatchlistItem(watchlistId, symbol),
     onSuccess: () => {
       toast.success("Added to watchlist");
       setSearchQuery("");

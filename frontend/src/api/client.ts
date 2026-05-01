@@ -98,7 +98,7 @@ apiClient.interceptors.response.use(
       isRefreshing = true;
 
       try {
-        const res = await axios.post<TokenPair>(`${API_BASE_URL}/auth/refresh`, {
+        const res = await axios.post<TokenPair>(`${API_BASE_URL}/token-refreshes`, {
           refresh_token: refreshToken,
         });
         setTokens(res.data);
